@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ChevronRight, Phone, Mail, Calendar, User as UserIcon } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
+import { TransparentCheckout } from '@/components/TransparentCheckout';
 
 export function PurchaseModal() {
   const {
@@ -18,7 +19,9 @@ export function PurchaseModal() {
     user,
     tenant,
     raffle,
-    ticketCount
+    ticketCount,
+    isCheckoutModalOpen, setIsCheckoutModalOpen,
+    checkoutPaymentData, setCheckoutPaymentData,
   } = useApp();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -188,8 +191,16 @@ export function PurchaseModal() {
           });
         }
 
+        // Salvar dados do pagamento e mostrar checkout
+        setCheckoutPaymentData({
+          paymentId: data.paymentId,
+          qrCode: data.qrCode,
+          qrCodeBase64: data.qrCodeBase64,
+          amount: data.amount
+        });
+
         setIsModalOpen(false);
-        router.push(`/${tenant?.slug}/checkout?paymentId=${data.paymentId}&raffle=${raffle.id}`);
+        setIsCheckoutModalOpen(true);
       } else {
         setPhoneError(data.error || 'Erro ao processar pagamento.');
       }
@@ -351,6 +362,34 @@ export function PurchaseModal() {
                 </div>
               )}
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      {isCheckoutModalOpen && checkoutPaymentData && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsCheckoutModalOpen(false)}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="relative w-full max-w-md"
+          >
+            <TransparentCheckout
+              paymentData={checkoutPaymentData}
+              onClose={() => setIsCheckoutModalOpen(false)}
+              onPaymentComplete={() => {
+                setIsCheckoutModalOpen(false);
+                // Redirect to success page or update UI
+              }}
+            />
           </motion.div>
         </div>
       )}

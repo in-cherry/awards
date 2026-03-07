@@ -94,6 +94,21 @@ interface AppContextType {
   setIsLoginStepPhone: React.Dispatch<React.SetStateAction<boolean>>;
   phoneError: string;
   setPhoneError: React.Dispatch<React.SetStateAction<string>>;
+  // Checkout states
+  isCheckoutModalOpen: boolean;
+  setIsCheckoutModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  checkoutPaymentData: {
+    paymentId: string;
+    qrCode: string;
+    qrCodeBase64: string;
+    amount: number;
+  } | null;
+  setCheckoutPaymentData: React.Dispatch<React.SetStateAction<{
+    paymentId: string;
+    qrCode: string;
+    qrCodeBase64: string;
+    amount: number;
+  } | null>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -128,6 +143,13 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
   const [loginUser, setLoginUser] = useState<any>(null);
   const [isLoginStepPhone, setIsLoginStepPhone] = useState(false);
   const [phoneError, setPhoneError] = useState('');
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [checkoutPaymentData, setCheckoutPaymentData] = useState<{
+    paymentId: string;
+    qrCode: string;
+    qrCodeBase64: string;
+    amount: number;
+  } | null>(null);
 
   return (
     <AppContext.Provider value={{
@@ -153,7 +175,9 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
       loginPhoneError, setLoginPhoneError,
       loginUser, setLoginUser,
       isLoginStepPhone, setIsLoginStepPhone,
-      phoneError, setPhoneError
+      phoneError, setPhoneError,
+      isCheckoutModalOpen, setIsCheckoutModalOpen,
+      checkoutPaymentData, setCheckoutPaymentData,
     }}>
       {children}
     </AppContext.Provider>

@@ -93,9 +93,16 @@ export async function POST(req: Request) {
       ? getBoxesForTickets(ticketCount, mysteryBoxConfig.rules)
       : 0;
 
-    // 6. Gerar pagamento PIX no Mercado Pago
-    // Split: se o tenant tem mpRecipientId, direcionamos 80% para ele
-    // platform_fee = 20% da transação
+    // 6. Configurar URL base para notifications
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
+    console.log('[DEBUG] baseUrl:', baseUrl);
+    console.log('[DEBUG] notification_url:', `${baseUrl}/api/payments/webhooks/mercadopago`);
+
+    // 7. Gerar pagamento PIX no Mercado Pago
+    // Split: se o tenant tem mpRecipientId, direcionamos parte para ele baseado na configuração
+    const platformFeePercentage = Number(process.env.PLATFORM_FEE_PERCENTAGE) || 20;
     const mpConfig = new MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN!,
     });
@@ -119,7 +126,6 @@ export async function POST(req: Request) {
       },
       description: `${ticketCount} bilhete${ticketCount > 1 ? 's' : ''} — ${raffle.title}`,
       external_reference: payment.id,
-      notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/webhooks/mercadopago`,
       metadata: {
         payment_db_id: payment.id,
         raffle_id: raffle.id,
@@ -129,9 +135,15 @@ export async function POST(req: Request) {
       },
     };
 
-    // Split: se tenant tem conta MP conectada, cobrar application_fee
+    // Só adiciona notification_url se não for localhost
+    if (!baseUrl.includes('localhost')) {
+      mpBody.notification_url = `${baseUrl}/api/payments/webhooks/mercadopago`;
+    }
+
+    // Split: se tenant tem conta MP conectada, cobrar application_fee baseado na configuração
     if (tenant.mpRecipientId) {
-      mpBody.application_fee = parseFloat((totalAmount * 0.20).toFixed(2));
+      const applicationFee = parseFloat((totalAmount * (platformFeePercentage / 100)).toFixed(2));
+      mpBody.application_fee = applicationFee;
       mpBody.collector_id = Number(tenant.mpRecipientId);
     }
 
@@ -155,6 +167,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
+      success: true,
       paymentId: payment.id,
       qrCode,
       qrCodeBase64,

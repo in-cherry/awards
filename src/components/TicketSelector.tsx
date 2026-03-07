@@ -15,11 +15,11 @@ const itemVariants = {
 
 export function TicketSelector() {
   const { raffle, ticketCount, setTicketCount, setIsModalOpen, setIsNewUser, setCpf, setCpfError, setPhoneError, setFormData } = useApp();
-  
+
   if (!raffle) return null;
 
   const handleQuantitySelect = (qty: number) => {
-    setTicketCount(qty);
+    setTicketCount(prev => prev + qty);
   };
 
   const handleIncrease = () => {
@@ -50,23 +50,17 @@ export function TicketSelector() {
   return (
     <motion.section variants={itemVariants} className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-8 space-y-8 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
-      
+
       <h2 className="text-center text-xs font-black tracking-[0.2em] text-gray-400 uppercase">Selecione a quantidade de bilhetes</h2>
-      
+
       <div className="grid grid-cols-4 gap-3">
         {[1, 5, 10, 100].map((num) => (
           <button
             key={num}
             onClick={() => handleQuantitySelect(num)}
-            className={`
-              p-4 rounded-2xl border-2 transition-all text-center space-y-2 group
-              ${ticketCount === num 
-                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' 
-                : 'border-white/10 bg-white/5 text-gray-400 hover:border-emerald-500/30 hover:bg-emerald-500/5'
-              }
-            `}
+            className="p-4 rounded-2xl border-2 border-white/10 bg-white/5 text-gray-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all text-center space-y-2 group"
           >
-            <p className="text-xs font-black uppercase tracking-wider">{num}</p>
+            <p className="text-xs font-black uppercase tracking-wider text-emerald-400">+{num}</p>
             <p className="text-[10px] text-gray-500 group-hover:text-gray-400">
               {num === 1 ? 'bilhete' : 'bilhetes'}
             </p>
