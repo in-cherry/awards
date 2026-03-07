@@ -1,5 +1,3 @@
-"use client";
-
 import React from 'react';
 import { motion } from 'motion/react';
 import { Lock } from 'lucide-react';
@@ -41,10 +39,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         <form onSubmit={handleAdminLogin} className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest ml-1">Usuário</label>
+              <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest ml-1">Email</label>
               <input
-                type="text"
-                placeholder="Digite o usuário"
+                type="email"
+                placeholder="Digite o email"
                 value={adminUsername}
                 onChange={(e) => setAdminUsername(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-emerald-500/50 transition-all text-center text-white"

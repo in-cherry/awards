@@ -1,127 +1,100 @@
-"use client";
+'use client';
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { AdminLogin } from './AdminLogin';
 import { AdminDashboard } from './AdminDashboard';
-import { Raffle, Ticket, Contributor } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 
-interface AdminPanelProps {
-  setIsAdmin: (val: boolean) => void;
-  raffle: Raffle;
-  setRaffle: (raffle: Raffle) => void;
-  tickets: Ticket[];
-  contributors: Contributor[];
+interface RaffleStats {
+  id: string;
+  title: string;
+  status: string;
+  totalNumbers: number;
+  soldTickets: number;
+  price: number;
+  mysteryBoxEnabled: boolean;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({
-  setIsAdmin,
-  raffle,
-  setRaffle,
-  tickets,
-  contributors
-}) => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminError, setAdminError] = useState('');
-  const [activeAdminTab, setActiveAdminTab] = useState<'stats' | 'config' | 'buyers' | 'micro'>('stats');
-  const [rankingFilter, setRankingFilter] = useState<'geral' | 'diaria' | 'semanal' | 'mensal'>('geral');
-  const [rankingDate, setRankingDate] = useState(new Date().toISOString().split('T')[0]);
+interface AdminPanelProps {
+  tenant: { id: string; name: string; slug: string };
+  stats: {
+    totalTicketsSold: number;
+    totalRevenue: number;
+    totalBuyers: number;
+  };
+  raffles: RaffleStats[];
+}
 
-  const [microWinner, setMicroWinner] = useState<{ name: string; prize: string } | null>(null);
-  const [isRaffling, setIsRaffling] = useState(false);
-  const [microPrizeInput, setMicroPrizeInput] = useState('');
-  const [microStartTime, setMicroStartTime] = useState('');
-  const [microEndTime, setMicroEndTime] = useState('');
+export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }) => {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminUsername === 'admin' && adminPassword === 'admin123') {
-      setIsAdminAuthenticated(true);
-      setAdminError('');
-    } else {
-      setAdminError('Usuário ou senha incorretos');
+    setError('');
+
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: username,
+          password: password,
+          tenantSlug: tenant.slug
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setIsAuthenticated(true);
+        setError('');
+      } else {
+        setError(data.error || 'Usuário ou senha incorretos');
+      }
+    } catch (error) {
+      setError('Erro ao fazer login. Tente novamente.');
     }
   };
 
-  const handleLogoutAdmin = () => {
-    setIsAdminAuthenticated(false);
-    setAdminUsername('');
-    setAdminPassword('');
-    setIsAdmin(false);
-  };
-
-  const handleRunMicroRaffle = (type: 'random' | 'time') => {
-    if (!microPrizeInput) {
-      alert('Por favor, informe o prêmio do sorteio.');
-      return;
-    }
-
-    setIsRaffling(true);
-    setMicroWinner(null);
-
-    setTimeout(() => {
-      const winners = ['Murilo Souza', 'Ana Clara', 'Roberto Silva', 'Juliana Lima'];
-      const randomWinner = winners[Math.floor(Math.random() * winners.length)];
-      setMicroWinner({ name: randomWinner, prize: microPrizeInput });
-      setIsRaffling(false);
-    }, 3000);
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUsername('');
+    setPassword('');
+    router.push(`/${tenant.slug}`);
   };
 
   return (
     <motion.div
-      key="admin"
-      initial={{ opacity: 0, x: 100 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -100 }}
-      className="relative z-10 min-h-screen bg-[#0f172a] pb-20"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-[#0f172a]"
     >
-      {!isAdminAuthenticated ? (
+      {!isAuthenticated ? (
         <AdminLogin
-          adminUsername={adminUsername}
-          setAdminUsername={setAdminUsername}
-          adminPassword={adminPassword}
-          setAdminPassword={setAdminPassword}
-          adminError={adminError}
-          handleAdminLogin={handleAdminLogin}
-          setIsAdmin={setIsAdmin}
+          adminUsername={username}
+          setAdminUsername={setUsername}
+          adminPassword={password}
+          setAdminPassword={setPassword}
+          adminError={error}
+          handleAdminLogin={handleLogin}
+          setIsAdmin={() => router.push(`/${tenant.slug}`)}
         />
       ) : (
         <AdminDashboard
-          isAdminAuthenticated={isAdminAuthenticated}
-          setIsAdminAuthenticated={setIsAdminAuthenticated}
-          adminUsername={adminUsername}
-          setAdminUsername={setAdminUsername}
-          adminPassword={adminPassword}
-          setAdminPassword={setAdminPassword}
-          adminError={adminError}
-          handleAdminLogin={handleAdminLogin}
-          setIsAdmin={setIsAdmin}
-          raffle={raffle}
-          setRaffle={setRaffle}
-          tickets={tickets}
-          contributors={contributors}
-          handleLogoutAdmin={handleLogoutAdmin}
-          activeAdminTab={activeAdminTab}
-          setActiveAdminTab={setActiveAdminTab}
-          rankingFilter={rankingFilter}
-          setRankingFilter={setRankingFilter}
-          rankingDate={rankingDate}
-          setRankingDate={setRankingDate}
-          microWinner={microWinner}
-          setMicroWinner={setMicroWinner}
-          isRaffling={isRaffling}
-          setIsRaffling={setIsRaffling}
-          microPrizeInput={microPrizeInput}
-          setMicroPrizeInput={setMicroPrizeInput}
-          microStartTime={microStartTime}
-          setMicroStartTime={setMicroStartTime}
-          microEndTime={microEndTime}
-          setMicroEndTime={setMicroEndTime}
-          handleRunMicroRaffle={handleRunMicroRaffle}
+          tenant={tenant}
+          stats={stats}
+          raffles={raffles}
+          onLogout={handleLogout}
         />
       )}
     </motion.div>
   );
 };
+

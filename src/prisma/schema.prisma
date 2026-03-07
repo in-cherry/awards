@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,16 +7,45 @@ datasource db {
 }
 
 // ==========================================
-// ESTRUTURA SAAS (O NOVO)
+// 1. GESTÃO DO SAAS (DONOS DE RIFAS)
 // ==========================================
 
-model Tenant {
-  id      String  @id @default(uuid())
-  slug    String  @unique
-  name    String
-  ownerId String?
+model User {
+  id       String   @id @default(cuid())
+  name     String
+  email    String   @unique
+  password String // Para login de admin
+  phone    String?  @unique
+  cpf      String?  @unique
+  role     UserRole @default(USER)
 
-  raffles Raffle[]
+  tenants Tenant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Tenant {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  name         String
+  slug         String  @unique
+  customDomain String? @unique
+  logoUrl      String?
+  isActive     Boolean @default(true)
+
+  // Mercado Pago — split de pagamentos (OAuth do tenant)
+  mpAccessToken String? // Access token MP do tenant (OAuth)
+  mpRecipientId String? // ID do recebedor no MP (collector_id)
+
+  raffles           Raffle[]
+  clients           Client[]
+  payments          Payment[]
+  verificationCodes VerificationCode[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -30,108 +53,214 @@ model Tenant {
   @@map("tenants")
 }
 
-// O antigo "tickets" do cliente agora é "Raffle" (A Rifa)
-model Raffle {
-  id             Int       @id @default(autoincrement())
-  tenantId       String
-  title          String
-  description    String?   @db.Text
-  pricePerNumber Decimal   @db.Decimal(10, 2)
-  minNumbers     Int       @default(1)
-  totalNumbers   Int
-  status         String    @default("ACTIVE") // ACTIVE, FINISHED, BLOCKED
-  drawDate       DateTime?
+// ==========================================
+// 2. AUTENTICAÇÃO OTP
+// ==========================================
 
-  // Relacionamentos
-  tenant   Tenant  @relation(fields: [tenantId], references: [id])
-  winnerId Int?
-  winner   Client? @relation(fields: [winnerId], references: [id])
+model VerificationCode {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  phone     String
+  code      String
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, phone])
+  @@map("verification_codes")
+}
+
+// ==========================================
+// 3. CLIENTES FINAIS (COMPRADORES)
+// ==========================================
+
+model Client {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name  String @db.VarChar(250)
+  cpf   String @db.VarChar(20)
+  phone String @db.VarChar(20)
+  email String @db.VarChar(250)
 
   payments Payment[]
-  numbers  Number[]
+  tickets  Ticket[]
+
+  wonRaffles       Raffle[]             @relation("RaffleWinner")
+  wonMysteryPrizes MysteryPrizeWinner[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
-  @@map("raffles")
-}
-
-// ==========================================
-// TABELAS MANTIDAS (COMO O CLIENTE PEDIU)
-// ==========================================
-
-model Client {
-  id    Int    @id @default(autoincrement())
-  name  String @db.VarChar(250)
-  cpf   String @unique @db.VarChar(20)
-  phone String @db.VarChar(20)
-  email String @db.VarChar(250)
-
-  payments   Payment[]
-  numbers    Number[]
-  wonRaffles Raffle[] // Rifas que este cliente ganhou
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([cpf]) // Melhora a velocidade na hora do usuário buscar seus bilhetes
-  @@index([phone])
+  @@unique([tenantId, cpf])
+  @@index([cpf])
   @@map("clients")
 }
 
-model Payment {
-  id         Int     @id @default(autoincrement())
-  clientId   Int     @map("client")
-  raffleId   Int     @map("ticket") // Mantém o nome "ticket" no DB, mas no código é raffleId
-  amount     Int // Quantidade de bilhetes (Antes era varchar)
-  priceTotal Decimal @db.Decimal(10, 2) // Valor total pago (Antes era varchar)
-  type       String  @db.VarChar(50) // ex: 'pix'
-  externalId String? @map("code_pix") @db.VarChar(250) // ID gerado pelo Mercado Pago
-  status     String  @db.VarChar(50) // 'approved', 'pending'
+// ==========================================
+// 4. CAMPANHAS E BILHETES
+// ==========================================
 
-  // Rastreio (Mantido do DB antigo)
-  ipAddress String? @map("ip_address") @db.VarChar(45)
-  userAgent String? @map("user_agent") @db.Text
+model Raffle {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  client  Client   @relation(fields: [clientId], references: [id])
-  raffle  Raffle   @relation(fields: [raffleId], references: [id])
-  numbers Number[]
+  title        String
+  description  String?      @db.Text
+  bannerUrl    String?
+  price        Decimal      @db.Decimal(10, 2)
+  minNumbers   Int          @default(1)
+  totalNumbers Int
+  status       RaffleStatus @default(DRAFT)
+  drawDate     DateTime?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  // Contador atômico para alocação eficiente de tickets (zero colisões)
+  // nextTicketNumber começa em 1 e vai sendo incrementado atomicamente
+  nextTicketNumber Int @default(1)
 
-  @@index([clientId])
-  @@index([raffleId])
-  @@index([status])
-  @@map("payment")
+  // Ganhador Principal
+  winnerId String?
+  winner   Client? @relation("RaffleWinner", fields: [winnerId], references: [id])
+
+  // Mystery Box Config (armazenado como JSON pelo dono da rifa)
+  // Ex: { rules: [{minTickets:400,boxes:1},{minTickets:600,boxes:2}], winProbability: 0.1 }
+  mysteryBoxEnabled Boolean @default(false)
+  mysteryBoxConfig  Json?
+
+  payments      Payment[]
+  tickets       Ticket[]
+  mysteryPrizes MysteryPrize[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("raffles")
 }
 
-model Number {
-  id        Int    @id @default(autoincrement())
-  clientId  Int    @map("client")
-  raffleId  Int    @map("ticket")
-  paymentId Int    @map("payment")
-  number    String @map("numbers") @db.VarChar(20) // O número da sorte gerado
+model Ticket {
+  id        String  @id @default(cuid())
+  raffleId  String
+  raffle    Raffle  @relation(fields: [raffleId], references: [id])
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id])
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id])
 
-  client  Client  @relation(fields: [clientId], references: [id])
-  raffle  Raffle  @relation(fields: [raffleId], references: [id])
-  payment Payment @relation(fields: [paymentId], references: [id])
+  // Inteiro para máxima eficiência em rifas com até 1M+ números
+  number Int
 
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@unique([raffleId, number]) // Trava anti-duplicidade: O mesmo número nunca pode ser vendido 2x na mesma rifa
-  @@index([clientId])
-  @@index([paymentId])
-  @@map("numbers")
-}
-
-model VerificationCode {
-  id        String   @id @default(uuid())
-  phone     String
-  code      String
-  expiresAt DateTime
   createdAt DateTime @default(now())
 
-  @@index([phone])
-  @@map("verification_codes")
+  @@unique([raffleId, number])
+  @@index([clientId])
+  @@index([paymentId])
+  @@map("tickets")
+}
+
+// ==========================================
+// 5. CAIXA MISTERIOSA
+// ==========================================
+
+model MysteryPrize {
+  id       String @id @default(cuid())
+  raffleId String
+  raffle   Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  totalAmount Int
+  remaining   Int
+
+  winners MysteryPrizeWinner[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("mystery_prizes")
+}
+
+model MysteryPrizeWinner {
+  id String @id @default(cuid())
+
+  prizeId String
+  prize   MysteryPrize @relation(fields: [prizeId], references: [id])
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id])
+
+  // Índice do box (0, 1, 2...) dentro do pagamento
+  boxIndex Int @default(0)
+
+  // Número do ticket que destravou (inteiro)
+  ticketNumber Int
+
+  awardedAt DateTime @default(now())
+
+  @@map("mystery_prize_winners")
+}
+
+// ==========================================
+// 6. FINANCEIRO
+// ==========================================
+
+model Payment {
+  id           String        @id @default(cuid())
+  externalId   String?       @unique // ID do Mercado Pago
+  status       PaymentStatus @default(PENDING)
+  amount       Decimal       @db.Decimal(10, 2)
+  ticketCount  Int // Quantos bilhetes foram comprados neste pedido
+  qrCode       String?       @db.Text
+  qrCodeBase64 String?       @db.Text
+
+  // Caixas Misteriosas concedidas neste pedido (calculado no webhook)
+  boxesGranted Int @default(0)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  raffleId String
+  raffle   Raffle @relation(fields: [raffleId], references: [id])
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  tickets    Ticket[]
+  mysteryWon MysteryPrizeWinner[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([externalId])
+  @@index([tenantId])
+  @@index([clientId])
+  @@map("payments")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum RaffleStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  CANCELLED
+  REFUNDED
 }

@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// ESTRUTURA SAAS (O NOVO)
+// ==========================================
+
+model Tenant {
+  id      String  @id @default(uuid())
+  slug    String  @unique
+  name    String
+  ownerId String?
+
+  raffles Raffle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenants")
+}
+
+// O antigo "tickets" do cliente agora é "Raffle" (A Rifa)
+model Raffle {
+  id             Int       @id @default(autoincrement())
+  tenantId       String
+  title          String
+  description    String?   @db.Text
+  pricePerNumber Decimal   @db.Decimal(10, 2)
+  minNumbers     Int       @default(1)
+  totalNumbers   Int
+  status         String    @default("ACTIVE") // ACTIVE, FINISHED, BLOCKED
+  drawDate       DateTime?
+
+  // Relacionamentos
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  winnerId Int?
+  winner   Client? @relation(fields: [winnerId], references: [id])
+
+  payments Payment[]
+  numbers  Number[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("raffles")
+}
+
+// ==========================================
+// TABELAS MANTIDAS (COMO O CLIENTE PEDIU)
+// ==========================================
+
+model Client {
+  id    Int    @id @default(autoincrement())
+  name  String @db.VarChar(250)
+  cpf   String @unique @db.VarChar(20)
+  phone String @db.VarChar(20)
+  email String @db.VarChar(250)
+
+  payments   Payment[]
+  numbers    Number[]
+  wonRaffles Raffle[] // Rifas que este cliente ganhou
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([cpf]) // Melhora a velocidade na hora do usuário buscar seus bilhetes
+  @@index([phone])
+  @@map("clients")
+}
+
+model Payment {
+  id         Int     @id @default(autoincrement())
+  clientId   Int     @map("client")
+  raffleId   Int     @map("ticket") // Mantém o nome "ticket" no DB, mas no código é raffleId
+  amount     Int // Quantidade de bilhetes (Antes era varchar)
+  priceTotal Decimal @db.Decimal(10, 2) // Valor total pago (Antes era varchar)
+  type       String  @db.VarChar(50) // ex: 'pix'
+  externalId String? @map("code_pix") @db.VarChar(250) // ID gerado pelo Mercado Pago
+  status     String  @db.VarChar(50) // 'approved', 'pending'
+
+  // Rastreio (Mantido do DB antigo)
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
+  client  Client   @relation(fields: [clientId], references: [id])
+  raffle  Raffle   @relation(fields: [raffleId], references: [id])
+  numbers Number[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@index([raffleId])
+  @@index([status])
+  @@map("payment")
+}
+
+model Number {
+  id        Int    @id @default(autoincrement())
+  clientId  Int    @map("client")
+  raffleId  Int    @map("ticket")
+  paymentId Int    @map("payment")
+  number    String @map("numbers") @db.VarChar(20) // O número da sorte gerado
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  raffle  Raffle  @relation(fields: [raffleId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([raffleId, number]) // Trava anti-duplicidade: O mesmo número nunca pode ser vendido 2x na mesma rifa
+  @@index([clientId])
+  @@index([paymentId])
+  @@map("numbers")
+}
+
+model VerificationCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("verification_codes")
+}

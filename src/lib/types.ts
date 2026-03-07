@@ -1,62 +1,68 @@
-export type Page = 'home' | 'checkout' | 'payment' | 'tickets' | 'admin';
+// ==========================================
+// PAGE PROPS — centralizados para evitar
+// redefinição em cada página
+// ==========================================
 
-export interface Raffle {
-  id: string;
-  title: string;
-  description: string;
-  pricePerTicket: number;
+export type SlugPageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+export type SlugIdPageProps = {
+  params: Promise<{ slug: string; id: string }>;
+};
+
+export type SlugSearchPageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+// ==========================================
+// MYSTERY BOX — tipos do JSON armazenado
+// ==========================================
+
+export type MysteryBoxRule = {
   minTickets: number;
-  totalTickets: number;
-  imageUrl: string;
-  status: 'active' | 'finished';
-  endDate: string;
-  winner: string | null;
-  salesBlocked: boolean;
-  rankingEnabled: boolean;
-  top3Prizes: string[];
-  organizer: {
+  boxes: number;
+};
+
+export type MysteryBoxConfig = {
+  rules: MysteryBoxRule[];
+  winProbability: number; // ex: 0.1 = 10% de chance por abertura
+};
+
+// ==========================================
+// TIPOS AUXILIARES PARA O FRONTEND
+// ==========================================
+
+export type ClientFormData = {
+  name: string;
+  cpf: string;
+  phone: string;
+  email: string;
+};
+
+export type PaymentApiResponse = {
+  paymentId: string;
+  qrCode: string;
+  qrCodeBase64: string;
+  amount: number;
+};
+
+export type PaymentStatus = 'PENDING' | 'APPROVED' | 'CANCELLED' | 'REFUNDED';
+
+export type PaymentStatusResponse = {
+  status: PaymentStatus;
+  boxesGranted: number;
+  clientCpf?: string;
+};
+
+export type MysteryBoxOpenResponse = {
+  won: boolean;
+  prize?: {
+    id: string;
     name: string;
-    avatarUrl: string;
-    supportUrl: string;
-    telegramUrl: string;
-    instagramUrl: string;
+    description: string | null;
   };
-  extraPrize: {
-    description: string;
-    value: number;
-  };
-  mysteryBox: {
-    enabled: boolean;
-    rules: { minTickets: number; boxes: number }[];
-    winProbability: number;
-    prizes: { id: number; name: string; winnerOrderNumber: string | null; probability: number | null }[];
-  };
-}
-
-export interface User {
-  cpf: string;
-  name: string;
-  phone: string;
-  birthDate: string;
-  email?: string;
-}
-
-export interface Contributor {
-  rank: number;
-  name: string;
-  ticketCount: number;
-  color: string;
-  category: string;
-}
-
-export interface Ticket {
-  orderNumber: string;
-  name: string;
-  phone: string;
-  cpf: string;
-  numbers: string[];
-  date: string;
-  status: string;
-  raffleTitle: string;
-  openedBoxes: { index: number; id: number; prize: string | null }[];
-}
+  boxesOpened: number;
+  boxesTotal: number;
+};

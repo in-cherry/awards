@@ -1,60 +1,26 @@
-import { Raffle, User, Contributor, Ticket } from './types';
+// Este arquivo contém dados MOCK que foram substituídos por dados reais do banco
+// Mantido apenas para referência histórica
 
-export const MOCK_USERS: User[] = [
-  {
-    cpf: '07163165102',
-    name: 'Murilo de Oliveira Souza',
-    phone: '11987654321',
-    birthDate: '1995-05-15'
+// Os dados agora vêm diretamente do banco de dados através do Prisma
+// Ver: src/prisma/seed.ts para dados de exemplo
+// Ver: src/app/[slug]/page.tsx para busca de dados reais,
+value: 300.00
   },
-  {
-    cpf: '98765432100',
-    name: 'Vagner Alberto Monteiro',
-    phone: '11912345678',
-    birthDate: '1988-10-20'
-  }
-];
-
-export const MOCK_RAFFLE: Raffle = {
-  id: 'raffle-001',
-  title: 'TITAN 160 (10 mil no PIX)',
-  description: 'O vencedor será definido no primeiro prêmio da loteria federal!',
-  pricePerTicket: 0.05,
-  minTickets: 100,
-  totalTickets: 1000000,
-  imageUrl: 'https://www.trgustavin.com.br/play/views/theme/trgustavin/assets/img/acao/titan.png',
-  status: 'active',
-  endDate: '2024-12-31',
-  winner: null,
-  salesBlocked: false,
-  rankingEnabled: true,
-  top3Prizes: ['R$ 500,00', 'R$ 300,00', 'R$ 200,00'],
-  organizer: {
-    name: 'TRGUSTAVIN',
-    avatarUrl: 'https://picsum.photos/seed/organizer/100/100',
-    supportUrl: '#',
-    telegramUrl: '#',
-    instagramUrl: '#'
-  },
-  extraPrize: {
-    description: 'O que comprar mais números leva o prêmio extra de:',
-    value: 300.00
-  },
-  mysteryBox: {
-    enabled: true,
+mysteryBox: {
+  enabled: true,
     rules: [
       { minTickets: 400, boxes: 1 },
       { minTickets: 600, boxes: 2 },
       { minTickets: 1200, boxes: 6 }
     ],
-    winProbability: 0.1,
-    prizes: [
-      { id: 1, name: 'R$ 500,00 no PIX', winnerOrderNumber: '240220-001', probability: null },
-      { id: 2, name: 'iPhone 15 Pro', winnerOrderNumber: '240222-003', probability: null },
-      { id: 3, name: 'R$ 1.000,00 no PIX', winnerOrderNumber: null, probability: null },
-      { id: 4, name: 'PlayStation 5', winnerOrderNumber: null, probability: null }
-    ]
-  }
+      winProbability: 0.1,
+        prizes: [
+          { id: 1, name: 'R$ 500,00 no PIX', winnerOrderNumber: '240220-001', probability: null },
+          { id: 2, name: 'iPhone 15 Pro', winnerOrderNumber: '240222-003', probability: null },
+          { id: 3, name: 'R$ 1.000,00 no PIX', winnerOrderNumber: null, probability: null },
+          { id: 4, name: 'PlayStation 5', winnerOrderNumber: null, probability: null }
+        ]
+}
 };
 
 export const MOCK_CONTRIBUTORS: Contributor[] = [
