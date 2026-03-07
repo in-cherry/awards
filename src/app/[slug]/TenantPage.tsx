@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy } from 'lucide-react';
+import { Trophy, LayoutDashboard } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Header } from '@/components/Header';
 import { SearchBar } from '@/components/SearchBar';
@@ -12,6 +12,9 @@ import { Ranking } from '@/components/Ranking';
 import { TicketSelector } from '@/components/TicketSelector';
 import { Footer } from '@/components/Footer';
 import { LoginModal } from '@/components/Modals/LoginModal';
+import { PurchaseModal } from '@/components/Modals/PurchaseModal';
+import { MysteryBoxModal } from '@/components/Modals/MysteryBoxModal';
+import Link from 'next/link';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -32,7 +35,7 @@ export default function TenantPage() {
   const { raffle, tenant } = useApp();
 
   return (
-    <div className="min-h-screen font-sans selection:bg-emerald-500/30 bg-[#0f172a] text-white overflow-x-hidden flex flex-col">
+    <div className="min-h-screen font-sans selection:bg-emerald-500/30 bg-[#0f172a] text-white overflow-x-hidden">
       {/* Background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] animate-blob" />
@@ -47,11 +50,11 @@ export default function TenantPage() {
           animate="visible"
           exit="hidden"
           variants={containerVariants}
-          className="relative z-10 flex-1 flex flex-col"
+          className="relative z-10 pb-12"
         >
           <Header />
 
-          <main className="max-w-2xl mx-auto px-4 mt-8 space-y-8 flex-1">
+          <main className="max-w-2xl mx-auto px-4 mt-8 space-y-8">
             {/* Raffle Status Banner */}
             {raffle?.status === 'FINISHED' && (
               <motion.div
@@ -64,33 +67,21 @@ export default function TenantPage() {
               </motion.div>
             )}
 
-            {raffle ? (
-              <>
-                <SearchBar />
-                <RaffleInfo />
-                <MysteryBoxInfo />
-                <Ranking />
-                <TicketSelector />
-              </>
-            ) : (
-              <motion.div
-                variants={itemVariants}
-                className="bg-gray-800 text-white p-6 rounded-3xl text-center space-y-2"
-              >
-                <h2 className="text-xl font-black font-display tracking-tight uppercase">Nenhuma Rifa Ativa</h2>
-                <p className="text-sm opacity-90">
-                  {tenant?.name} não possui rifas ativas no momento.
-                </p>
-              </motion.div>
-            )}
+            <SearchBar />
+            <RaffleInfo />
+            <MysteryBoxInfo />
+            <Ranking />
 
+            <TicketSelector />
+            <Footer />
           </main>
-
-          <Footer />
         </motion.div>
       </AnimatePresence>
 
+      {/* Modals */}
       <LoginModal />
+      <PurchaseModal />
+      <MysteryBoxModal />
     </div>
   );
 }

@@ -1,21 +1,45 @@
 "use client";
 
-import { useState } from 'react';
+import React from 'react';
 import { Search } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useApp } from '@/contexts/AppContext';
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
 
 export function SearchBar() {
-  const [search, setSearch] = useState('');
+  const { 
+    setIsLoginModalOpen, 
+    setLoginCpf, 
+    setLoginCpfError, 
+    setLoginPhone, 
+    setLoginPhoneError, 
+    setIsLoginStepPhone, 
+    setLoginUser 
+  } = useApp();
+
+  const handleOpenLogin = () => {
+    setIsLoginModalOpen(true);
+    setLoginCpf('');
+    setLoginCpfError('');
+    setLoginPhone('');
+    setLoginPhoneError('');
+    setIsLoginStepPhone(false);
+    setLoginUser(null);
+  };
 
   return (
-    <div className="relative">
-      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-      <input
-        type="text"
-        placeholder="Buscar por número ou nome..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-      />
-    </div>
+    <motion.div variants={itemVariants} className="relative group">
+      <button
+        onClick={handleOpenLogin}
+        className="flex items-center justify-center w-full gap-3 px-4 py-4 border border-white/10 rounded-2xl bg-white/5 backdrop-blur-md text-gray-400 hover:text-white hover:bg-white/10 hover:border-emerald-500/30 transition-all text-center font-bold text-sm tracking-[0.2em] outline-none group cursor-pointer"
+      >
+        <Search size={20} />
+        <span>VER MEUS BILHETES</span>
+      </button>
+    </motion.div>
   );
 }

@@ -1,40 +1,17 @@
-import { Ticket } from './types';
+// Utility functions - currently not in use
+// All data now comes from database via Prisma
 
-export const getWinnerNameByOrderNumber = (orderNumber: string | null, tickets: Ticket[]) => {
-  if (!orderNumber) return null;
-  const ticket = tickets.find(t => t.orderNumber === orderNumber);
-  return ticket ? ticket.name : 'Desconhecido';
+export const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(amount);
 };
 
-export const maskName = (name: string) => {
-  if (!name) return '';
-  const parts = name.split(' ').filter(p => p.length > 0);
-  if (parts.length === 0) return '';
-
-  const prepositions = ['de', 'da', 'do', 'dos', 'das', 'e'];
-  const firstName = parts[0];
-
-  if (parts.length === 1) return firstName;
-
-  let secondPartIndex = 1;
-  let displayName = firstName;
-
-  if (prepositions.includes(parts[1].toLowerCase()) && parts.length > 2) {
-    displayName += ' ' + parts[1];
-    secondPartIndex = 2;
-  }
-
-  const secondPart = parts[secondPartIndex];
-  if (secondPart) {
-    displayName += ' ' + secondPart[0] + '...';
-  }
-
-  return displayName;
+export const formatPhone = (phone: string): string => {
+  return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
 };
 
-export const maskPhone = (phone: string) => {
-  if (!phone) return '';
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length < 4) return phone;
-  return `(${digits.substring(0, 2)}) *****-${digits.substring(digits.length - 4)}`;
+export const formatCPF = (cpf: string): string => {
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 };

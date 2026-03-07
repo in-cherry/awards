@@ -1,33 +1,10 @@
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, LayoutDashboard } from 'lucide-react';
 import { AppContextProvider } from '@/contexts/AppContext';
-import { Header } from '@/components/Header';
-import { SearchBar } from '@/components/SearchBar';
-import { RaffleInfo } from '@/components/RaffleInfo';
-import { MysteryBoxInfo } from '@/components/MysteryBoxInfo';
-import { Ranking } from '@/components/Ranking';
-import { TicketSelector } from '@/components/TicketSelector';
-import { Footer } from '@/components/Footer';
-import Link from 'next/link';
 import TenantPage from './TenantPage';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
 
 interface PageProps {
   params: Promise<{ slug: string }>;
