@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Copy, Check, RefreshCw, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/contexts/AppContext';
+import { getSession } from '@/lib/session';
 
 interface TransparentCheckoutProps {
   paymentData: {
@@ -23,7 +24,7 @@ export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }:
   const [checking, setChecking] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'approved' | 'cancelled'>('pending');
   const router = useRouter();
-  const { tenant } = useApp();
+  const { tenant, user, setIsLoginModalOpen } = useApp();
 
   const handleCopyPix = async () => {
     try {
@@ -45,7 +46,12 @@ export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }:
         setPaymentStatus('approved');
         setTimeout(() => {
           onPaymentComplete?.();
-          router.push(`/${tenant?.slug}/my-tickets`);
+          const session = getSession();
+          if (session?.cpf) {
+            router.push(`/${tenant?.slug}/meus-bilhetes?cpf=${session.cpf.replace(/\D/g, '')}`);
+          } else {
+            setIsLoginModalOpen(true);
+          }
         }, 2000);
       } else if (data.status === 'CANCELLED') {
         setPaymentStatus('cancelled');

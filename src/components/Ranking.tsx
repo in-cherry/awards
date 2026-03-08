@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Users, Trophy } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
@@ -10,15 +10,25 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
-// Mock contributors for demonstration - in real app this would come from database
-const MOCK_CONTRIBUTORS = [
-  { rank: 1, name: 'João Silva', tickets: 150, category: 'geral' },
-  { rank: 2, name: 'Maria Santos', tickets: 120, category: 'geral' },
-  { rank: 3, name: 'Pedro Costa', tickets: 90, category: 'geral' }
-];
-
 export function Ranking() {
-  const { raffle } = useApp();
+  const { raffle, tenant } = useApp();
+  const [rankingList, setRankingList] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchRanking() {
+      if (!tenant?.slug) return;
+      try {
+        const res = await fetch(`/api/ranking/${tenant.slug}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRankingList(data.ranking);
+        }
+      } catch (e) {
+        console.error('Failed to fetch ranking', e);
+      }
+    }
+    fetchRanking();
+  }, [tenant?.slug]);
 
   // For now, always show ranking - in real app check raffle.rankingEnabled when implemented
   if (!raffle) return null;
@@ -50,24 +60,24 @@ export function Ranking() {
       </div>
 
       <div className="grid grid-cols-3 gap-6">
-        {MOCK_CONTRIBUTORS.filter(c => c.category === 'geral').slice(0, 3).map((user) => (
+        {rankingList.slice(0, 3).map((user) => (
           <motion.div
             key={user.rank}
             whileHover={{ y: -5 }}
             className="flex flex-col items-center text-center space-y-3"
           >
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-black text-lg border-2 ${user.rank === 1
-                ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400'
-                : user.rank === 2
-                  ? 'bg-gray-300/20 border-gray-300 text-gray-300'
-                  : 'bg-orange-500/20 border-orange-500 text-orange-400'
+              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400'
+              : user.rank === 2
+                ? 'bg-gray-300/20 border-gray-300 text-gray-300'
+                : 'bg-orange-500/20 border-orange-500 text-orange-400'
               }`}>
               {user.rank}º
             </div>
             <div>
               <p className="text-sm font-black text-white">{user.name}</p>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                {user.tickets} bilhetes
+                {user.ticketCount} bilhetes
               </p>
             </div>
           </motion.div>

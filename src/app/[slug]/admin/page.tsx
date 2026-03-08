@@ -12,6 +12,9 @@ export default async function AdminPage({ params }: SlugPageProps) {
       id: true,
       name: true,
       slug: true,
+      customDomain: true,
+      logoUrl: true,
+      faviconUrl: true,
       raffles: {
         where: { status: { in: ['ACTIVE', 'FINISHED'] } },
         orderBy: { createdAt: 'desc' },
@@ -23,6 +26,9 @@ export default async function AdminPage({ params }: SlugPageProps) {
           nextTicketNumber: true,
           price: true,
           mysteryBoxEnabled: true,
+          description: true,
+          bannerUrl: true,
+          minNumbers: true,
           _count: { select: { tickets: true, payments: true } },
         },
       },
@@ -31,20 +37,24 @@ export default async function AdminPage({ params }: SlugPageProps) {
 
   if (!tenant) notFound();
 
+  const totalRevenue = tenant.raffles.reduce(
+    (sum: number, r: any) => sum + r._count.tickets * Number(r.price),
+    0
+  );
+
   const stats = {
-    totalTicketsSold: tenant.raffles.reduce((sum, r) => sum + r._count.tickets, 0),
-    totalRevenue: tenant.raffles.reduce(
-      (sum, r) => sum + r._count.tickets * Number(r.price),
-      0
-    ),
+    totalTicketsSold: tenant.raffles.reduce((sum: number, r: any) => sum + r._count.tickets, 0),
+    totalRevenue,
+    totalFee: totalRevenue * 0.2,
+    netRevenue: totalRevenue * 0.8,
     totalBuyers: await prisma.client.count({ where: { tenantId: tenant.id } }),
   };
 
   return (
     <AdminPanel
-      tenant={{ id: tenant.id, name: tenant.name, slug: tenant.slug }}
+      tenant={{ id: tenant.id, name: tenant.name, slug: tenant.slug, customDomain: tenant.customDomain, logoUrl: tenant.logoUrl ?? undefined, faviconUrl: tenant.faviconUrl ?? undefined }}
       stats={stats}
-      raffles={tenant.raffles.map((r) => ({
+      raffles={tenant.raffles.map((r: any) => ({
         id: r.id,
         title: r.title,
         status: r.status,
@@ -52,6 +62,9 @@ export default async function AdminPage({ params }: SlugPageProps) {
         soldTickets: r._count.tickets,
         price: Number(r.price),
         mysteryBoxEnabled: r.mysteryBoxEnabled,
+        minNumbers: r.minNumbers,
+        bannerUrl: r.bannerUrl,
+        description: r.description,
       }))}
     />
   );

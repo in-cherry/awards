@@ -4,6 +4,10 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, ChevronUp, Gift, X, Trophy, Loader2, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useApp } from '@/contexts/AppContext';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
+import { TrustBadges } from '@/components/TrustBadges';
 
 interface OpenedBox {
   id: string;
@@ -35,49 +39,34 @@ interface MyTicketsClientProps {
   notFound?: boolean;
 }
 
-function CpfSearchForm({ slug }: { slug: string }) {
-  const [cpf, setCpf] = useState('');
+function RedirectToLogin({ slug }: { slug: string }) {
   const router = useRouter();
+  const { user, setIsLoginModalOpen } = useApp();
 
-  function formatCpf(value: string) {
-    const digits = value.replace(/\D/g, '').slice(0, 11);
-    return digits
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  }
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const digits = cpf.replace(/\D/g, '');
-    if (digits.length === 11) {
-      router.push(`/${slug}/my-tickets?cpf=${digits}`);
+  React.useEffect(() => {
+    if (user?.cpf) {
+      const digits = user.cpf.replace(/\D/g, '');
+      if (digits.length === 11) {
+        router.replace(`/${slug}/meus-bilhetes?cpf=${digits}`);
+      }
+    } else {
+      // Unauthenticated -> back to slug and open Login
+      setIsLoginModalOpen(true);
+      router.replace(`/${slug}`);
     }
-  }
+  }, [user, router, slug, setIsLoginModalOpen]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-black tracking-tight">Meus Bilhetes</h1>
-          <p className="text-gray-400 text-sm">Informe seu CPF para consultar seus bilhetes</p>
+    <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
+      <Header />
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <div className="flex items-center justify-center space-x-2">
+          <Loader2 size={24} className="animate-spin text-emerald-500" />
+          <p className="text-emerald-500 font-bold">Verificando autentição...</p>
         </div>
-        <form onSubmit={handleSearch} className="space-y-4">
-          <input
-            type="text"
-            placeholder="000.000.000-00"
-            value={cpf}
-            onChange={(e) => setCpf(formatCpf(e.target.value))}
-            className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-lg font-bold outline-none focus:border-emerald-500/50 transition-all text-center text-white"
-          />
-          <button
-            type="submit"
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Search size={18} />
-            Buscar Bilhetes
-          </button>
-        </form>
+      </div>
+      <div className="p-4 w-full max-w-2xl mx-auto">
+        <Footer />
       </div>
     </div>
   );
@@ -163,31 +152,33 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
   );
 
   if (!initialData) {
-    return <CpfSearchForm slug={slug} />;
+    return <RedirectToLogin slug={slug} />;
   }
 
   if (cpfNotFound) {
     return (
-      <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center p-6">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-black">CPF não encontrado</h1>
-          <p className="text-gray-400 text-sm">
-            Nenhum bilhete encontrado para este CPF nesta loja.
-          </p>
+      <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
+        <Header />
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-black">CPF não encontrado</h1>
+            <p className="text-gray-400 text-sm">
+              Nenhum bilhete encontrado para este CPF nesta loja.
+            </p>
+          </div>
+        </div>
+        <div className="p-4 w-full max-w-2xl mx-auto">
+          <Footer />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white">
-      <header className="py-6 px-4 border-b border-white/5">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-sm font-black tracking-[0.2em] text-emerald-400 uppercase">Winzy</h1>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
+      <Header />
 
-      <main className="max-w-2xl mx-auto px-4 py-10 space-y-6">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-10 space-y-6">
         {/* Result popup */}
         <AnimatePresence>
           {boxResult && (
@@ -195,14 +186,14 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -20, opacity: 0 }}
-              className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl px-6 py-4 shadow-2xl border text-center ${boxResult.won
-                  ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
-                  : 'bg-gray-700/50 border-white/10 text-gray-300'
+              className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl px-6 py-4 shadow-2xl border text-center ${boxResult?.won
+                ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
+                : 'bg-gray-700/50 border-white/10 text-gray-300'
                 }`}
             >
-              {boxResult.won ? (
+              {boxResult?.won ? (
                 <p className="font-black text-sm">
-                  🏆 Você ganhou: <span className="text-white">{boxResult.prizeName}</span>!
+                  🏆 Você ganhou: <span className="text-white">{boxResult?.prizeName}</span>!
                 </p>
               ) : (
                 <p className="font-bold text-sm">Que pena! Desta vez não foi. Tente outra caixa!</p>
@@ -288,12 +279,12 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
                                       onClick={() => !opened && handleOpenBox(currentPaymentData, idx)}
                                       disabled={!!opened || !!openingBox}
                                       className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border-2 transition-all text-[10px] font-black ${opened
-                                          ? opened.prizeName
-                                            ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500'
-                                            : 'bg-gray-500/20 border-gray-500/50 text-gray-500'
-                                          : isOpening
-                                            ? 'bg-purple-500/30 border-purple-500/50 text-purple-400'
-                                            : 'bg-purple-500/20 border-purple-500/50 text-purple-400 hover:scale-105 hover:bg-purple-500/30 cursor-pointer'
+                                        ? opened.prizeName
+                                          ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500'
+                                          : 'bg-gray-500/20 border-gray-500/50 text-gray-500'
+                                        : isOpening
+                                          ? 'bg-purple-500/30 border-purple-500/50 text-purple-400'
+                                          : 'bg-purple-500/20 border-purple-500/50 text-purple-400 hover:scale-105 hover:bg-purple-500/30 cursor-pointer'
                                         }`}
                                     >
                                       {isOpening ? (
@@ -368,6 +359,8 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
           </div>
         )}
       </main>
+
+      <div className="max-w-2xl mx-auto px-4 pb-8"><TrustBadges /><Footer /></div>
     </div>
   );
 }

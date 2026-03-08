@@ -10,6 +10,7 @@ import { RaffleInfo } from '@/components/RaffleInfo';
 import { MysteryBoxInfo } from '@/components/MysteryBoxInfo';
 import { Ranking } from '@/components/Ranking';
 import { TicketSelector } from '@/components/TicketSelector';
+import { TrustBadges } from '@/components/TrustBadges';
 import { Footer } from '@/components/Footer';
 import { LoginModal } from '@/components/Modals/LoginModal';
 import { PurchaseModal } from '@/components/Modals/PurchaseModal';
@@ -74,6 +75,7 @@ export default function TenantPage() {
             <Ranking />
 
             <TicketSelector />
+            <TrustBadges />
             <Footer />
           </main>
         </motion.div>

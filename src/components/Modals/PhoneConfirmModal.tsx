@@ -90,6 +90,11 @@ export function PhoneConfirmModal() {
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 text-center space-y-2">
                 <ShieldCheck className="mx-auto text-emerald-400" size={28} />
                 <p className="text-base font-black text-white">Olá, {user.name.split(' ')[0]}!</p>
+                {user.cpf && (
+                  <p className="text-sm font-bold text-gray-300">
+                    CPF: ***.{user.cpf.replace(/\D/g, '').slice(3, 6)}.{user.cpf.replace(/\D/g, '').slice(6, 9)}-**
+                  </p>
+                )}
                 <p className="text-xs text-gray-400">
                   Confirme seu telefone para garantir que é você quem está comprando.
                 </p>

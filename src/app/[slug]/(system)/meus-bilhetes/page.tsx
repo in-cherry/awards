@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { MyTicketsClient } from './MyTicketsClient';
 import { SlugSearchPageProps } from '@/lib/types';
+import { AppContextProvider } from '@/contexts/AppContext';
 
 export default async function MyTicketsPage({ params, searchParams }: SlugSearchPageProps) {
   const { slug } = await params;
@@ -12,8 +13,20 @@ export default async function MyTicketsPage({ params, searchParams }: SlugSearch
 
   const clientCpf = typeof cpf === 'string' ? cpf.replace(/\D/g, '') : null;
 
+  const tenantData = {
+    id: tenant.id,
+    name: tenant.name,
+    slug: tenant.slug,
+    logoUrl: tenant.logoUrl,
+    isActive: tenant.isActive
+  };
+
   if (!clientCpf) {
-    return <MyTicketsClient slug={slug} initialData={null} />;
+    return (
+      <AppContextProvider tenant={tenantData}>
+        <MyTicketsClient slug={slug} initialData={null} />
+      </AppContextProvider>
+    );
   }
 
   const client = await prisma.client.findUnique({
@@ -21,7 +34,11 @@ export default async function MyTicketsPage({ params, searchParams }: SlugSearch
   });
 
   if (!client) {
-    return <MyTicketsClient slug={slug} initialData={null} notFound />;
+    return (
+      <AppContextProvider tenant={tenantData}>
+        <MyTicketsClient slug={slug} initialData={null} notFound />
+      </AppContextProvider>
+    );
   }
 
   const payments = await prisma.payment.findMany({
@@ -50,15 +67,15 @@ export default async function MyTicketsPage({ params, searchParams }: SlugSearch
     },
   });
 
-  const data = payments.map((p) => ({
+  const data = payments.map((p: any) => ({
     id: p.id,
     amount: Number(p.amount),
     ticketCount: p.ticketCount,
     boxesGranted: p.boxesGranted,
     createdAt: p.createdAt.toISOString(),
     raffle: p.raffle,
-    tickets: p.tickets.map((t) => t.number),
-    openedBoxes: p.mysteryWon.map((w) => ({
+    tickets: p.tickets.map((t: any) => t.number),
+    openedBoxes: p.mysteryWon.map((w: any) => ({
       id: w.id,
       boxIndex: w.boxIndex,
       prizeId: w.prize.id,
@@ -67,10 +84,12 @@ export default async function MyTicketsPage({ params, searchParams }: SlugSearch
   }));
 
   return (
-    <MyTicketsClient
-      slug={slug}
-      initialData={{ cpf: clientCpf, name: client.name, payments: data }}
-    />
+    <AppContextProvider tenant={tenantData}>
+      <MyTicketsClient
+        slug={slug}
+        initialData={{ cpf: clientCpf, name: client.name, payments: data }}
+      />
+    </AppContextProvider>
   );
 }
 

@@ -6,6 +6,7 @@ import { X, ChevronRight, Phone, Mail, Calendar, User as UserIcon } from 'lucide
 import { useApp } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
 import { TransparentCheckout } from '@/components/TransparentCheckout';
+import { saveSession } from '@/lib/session';
 
 export function PurchaseModal() {
   const {
@@ -181,14 +182,16 @@ export function PurchaseModal() {
       const data = await response.json();
 
       if (data.success) {
-        // Salvar dados do usuário no contexto
+        // Salvar dados do usuário no contexto e na session
         if (isNewUser) {
-          setUser({
+          const userData = {
             name: formData.name,
             email: formData.email,
             phone: formData.phone,
             cpf: cpf
-          });
+          };
+          setUser(userData);
+          saveSession(userData);
         }
 
         // Salvar dados do pagamento e mostrar checkout

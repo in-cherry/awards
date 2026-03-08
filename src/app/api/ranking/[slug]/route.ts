@@ -37,8 +37,8 @@ export async function GET(
 
     // Formatar dados para o frontend
     const formattedRanking = ranking
-      .filter(client => client._count.tickets > 0) // Apenas clientes com tickets
-      .map((client, index) => ({
+      .filter((client: any) => client._count.tickets > 0) // Apenas clientes com tickets
+      .map((client: any, index: any) => ({
         rank: index + 1,
         name: client.name,
         ticketCount: client._count.tickets,

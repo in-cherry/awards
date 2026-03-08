@@ -12,23 +12,23 @@ const itemVariants = {
 };
 
 export function SearchBar() {
-  const { 
+  const {
     user,
     tenant,
-    setIsLoginModalOpen, 
-    setLoginCpf, 
-    setLoginCpfError, 
-    setLoginPhone, 
-    setLoginPhoneError, 
-    setIsLoginStepPhone, 
-    setLoginUser 
+    setIsLoginModalOpen,
+    setLoginCpf,
+    setLoginCpfError,
+    setLoginPhone,
+    setLoginPhoneError,
+    setIsLoginStepPhone,
+    setLoginUser
   } = useApp();
   const router = useRouter();
 
   const handleOpenLogin = () => {
     // Se o usuário já tem sessão válida, redireciona direto para os bilhetes
     if (user?.cpf) {
-      router.push(`/${tenant?.slug}/my-tickets?cpf=${user.cpf.replace(/\D/g, '')}`);
+      router.push(`/${tenant?.slug}/meus-bilhetes?cpf=${user.cpf.replace(/\D/g, '')}`);
       return;
     }
     setIsLoginModalOpen(true);

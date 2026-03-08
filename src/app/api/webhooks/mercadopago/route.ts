@@ -100,7 +100,7 @@ export async function POST(req: Request) {
     const ticketCount = payment.ticketCount;
 
     // Atualizar nextTicketNumber atomicamente e pegar o valor anterior
-    const updatedRaffle = await prisma.$transaction(async (tx) => {
+    const updatedRaffle = await prisma.$transaction(async (tx: any) => {
       const raffle = await tx.raffle.findUnique({
         where: { id: payment.raffleId },
         select: { nextTicketNumber: true, totalNumbers: true },

@@ -140,7 +140,7 @@ export function LoginModal() {
       setLoginPhoneError('');
       // Redireciona com o CPF na URL para carregar os bilhetes direto
       const cleanCpf = loginUser.cpf?.replace(/\D/g, '') || '';
-      router.push(`/${tenant?.slug}/my-tickets?cpf=${cleanCpf}`);
+      router.push(`/${tenant?.slug}/meus-bilhetes?cpf=${cleanCpf}`);
     } else {
       setLoginPhoneError('Telefone incorreto.');
     }

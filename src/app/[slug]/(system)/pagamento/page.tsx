@@ -39,7 +39,7 @@ export default async function CheckoutPage({ params, searchParams }: SlugSearchP
     : null;
 
   const availablePrizesCount = raffle.mysteryPrizes.reduce(
-    (sum, p) => sum + p.remaining,
+    (sum: number, p: any) => sum + p.remaining,
     0
   );
 

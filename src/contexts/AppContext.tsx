@@ -9,6 +9,10 @@ type Tenant = {
   slug: string;
   logoUrl?: string | null;
   isActive: boolean;
+  owner?: {
+    name: string;
+    avatarUrl: string | null;
+  };
 };
 
 type Raffle = {
@@ -24,6 +28,7 @@ type Raffle = {
   nextTicketNumber: number;
   mysteryBoxEnabled: boolean;
   mysteryBoxConfig?: any;
+  mysteryPrizes?: any[];
   winnerId?: string | null;
 };
 

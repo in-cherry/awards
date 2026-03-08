@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const tenantFavicon = tenant?.faviconUrl || `/${slug}.ico`;
 
   return {
-    title: `Winzy | ${tenantName}`,
+    title: `Winzy | ${tenantName} - Dashboard`,
     icons: {
       icon: tenantFavicon,
     },

@@ -14,13 +14,26 @@ interface RaffleStats {
   soldTickets: number;
   price: number;
   mysteryBoxEnabled: boolean;
+  minNumbers: number;
+  bannerUrl?: string | null;
+  description?: string | null;
 }
 
 interface AdminPanelProps {
-  tenant: { id: string; name: string; slug: string };
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl?: string;
+    faviconUrl?: string;
+    customDomain?: string | null;
+    owner?: { id: string; name: string; avatarUrl?: string | null; };
+  };
   stats: {
     totalTicketsSold: number;
     totalRevenue: number;
+    totalFee: number;
+    netRevenue: number;
     totalBuyers: number;
   };
   raffles: RaffleStats[];
@@ -32,6 +45,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    const sessionKey = `admin_session_${tenant.slug}`;
+    const storedSession = localStorage.getItem(sessionKey);
+    if (storedSession) {
+      const { expiry } = JSON.parse(storedSession);
+      if (new Date().getTime() < expiry) {
+        setIsAuthenticated(true);
+      } else {
+        localStorage.removeItem(sessionKey);
+      }
+    }
+  }, [tenant.slug]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +79,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }
       const data = await response.json();
 
       if (response.ok && data.success) {
+        const sessionData = {
+          expiry: new Date().getTime() + 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+        };
+        localStorage.setItem(`admin_session_${tenant.slug}`, JSON.stringify(sessionData));
         setIsAuthenticated(true);
         setError('');
       } else {
@@ -64,6 +94,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem(`admin_session_${tenant.slug}`);
     setIsAuthenticated(false);
     setUsername('');
     setPassword('');

@@ -11,40 +11,10 @@ const itemVariants = {
 
 export function Footer() {
   return (
-    <motion.div variants={itemVariants} className="space-y-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6 space-y-4 group hover:border-emerald-500/30 transition-colors">
-          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Método de Pagamento</p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
-              <Smartphone size={20} className="text-white" />
-            </div>
-            <span className="text-lg font-black font-display tracking-tighter">pix</span>
-          </div>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6 space-y-4 group hover:border-blue-500/30 transition-colors">
-          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Sorteio Oficial</p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform">
-              <div className="grid grid-cols-2 gap-1">
-                <div className="w-2 h-2 bg-white rounded-full" />
-                <div className="w-2 h-2 bg-white rounded-full" />
-                <div className="w-2 h-2 bg-white rounded-full" />
-                <div className="w-2 h-2 bg-white rounded-full" />
-              </div>
-            </div>
-            <span className="text-[10px] font-black leading-tight uppercase tracking-tighter">Loterias<br /><span className="text-blue-400">CAIXA</span></span>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer separado */}
-      <div className="text-center py-4 border-t border-white/5">
-        <p className="text-xs text-gray-500">
-          &copy; 2026 Desenvolvido por <a href="https://winzy.com.br" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 transition-colors font-bold">Winzy</a>. Todos os direitos reservados.
-        </p>
-      </div>
+    <motion.div variants={itemVariants} className="text-center py-4 mt-6">
+      <p className="text-xs text-gray-500">
+        &copy; 2026 Desenvolvido por <a href="https://winzy.com.br" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 transition-colors font-bold">Winzy</a>. Todos os direitos reservados.
+      </p>
     </motion.div>
   );
 }

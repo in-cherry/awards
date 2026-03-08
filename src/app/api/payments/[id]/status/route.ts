@@ -75,7 +75,7 @@ export async function GET(
         unitPrice: payment.raffle.price,
       },
 
-      tickets: payment.tickets.map(ticket => ({
+      tickets: payment.tickets.map((ticket: any) => ({
         id: ticket.id,
         number: ticket.number,
       })),

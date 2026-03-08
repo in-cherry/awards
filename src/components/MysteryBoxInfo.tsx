@@ -11,13 +11,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
-// Mock prizes for now - in production this would come from database
-const MOCK_MYSTERY_PRIZES = [
-  { id: 1, name: 'R$ 500,00 no PIX', winner: 'MURILO OLIVEIRA SOUZA', isWon: true },
-  { id: 2, name: 'iPhone 15 Pro', winner: 'MURILO OLIVEIRA SOUZA', isWon: true },
-  { id: 3, name: 'R$ 1.000,00 no PIX', winner: null, isWon: false },
-  { id: 4, name: 'PlayStation 5', winner: null, isWon: false }
-];
+// Removing MOCK_MYSTERY_PRIZES
 
 export function MysteryBoxInfo() {
   const { raffle, ticketCount } = useApp();
@@ -28,12 +22,24 @@ export function MysteryBoxInfo() {
     const config = parseMysteryBoxConfig(raffle.mysteryBoxConfig);
     if (!config) return null;
 
+    const prizes = raffle.mysteryPrizes || [];
+    const normalizedPrizes = prizes.map((p) => {
+      const winner = p.winners?.[0]; // Assuming one winner for simplicity, or we can check remaining
+      return {
+        id: p.id,
+        name: p.title,
+        winner: winner?.client?.name || null,
+        isWon: p.remaining === 0 || winner
+      };
+    });
+
     return {
       config,
       currentBoxes: getBoxesForTickets(ticketCount, config.rules),
-      totalPrizes: MOCK_MYSTERY_PRIZES.length,
-      wonPrizes: MOCK_MYSTERY_PRIZES.filter(p => p.isWon).length,
-      availablePrizes: MOCK_MYSTERY_PRIZES.filter(p => !p.isWon).length
+      totalPrizes: normalizedPrizes.length,
+      wonPrizes: normalizedPrizes.filter(p => p.isWon).length,
+      availablePrizes: normalizedPrizes.filter(p => !p.isWon).length,
+      prizesList: normalizedPrizes
     };
   }, [raffle, ticketCount]);
 
@@ -41,7 +47,7 @@ export function MysteryBoxInfo() {
     return null;
   }
 
-  const { config, currentBoxes, totalPrizes, wonPrizes, availablePrizes } = mysteryBoxData;
+  const { config, currentBoxes, totalPrizes, wonPrizes, availablePrizes, prizesList } = mysteryBoxData;
 
   return (
     <motion.section variants={itemVariants} className="space-y-6">
@@ -106,12 +112,12 @@ export function MysteryBoxInfo() {
         </div>
 
         <div className="space-y-3">
-          {MOCK_MYSTERY_PRIZES.map((prize, index) => (
+          {prizesList.map((prize, index) => (
             <div
               key={prize.id}
               className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${prize.isWon
-                  ? 'bg-gray-500/10 border-gray-500/20'
-                  : 'bg-emerald-500/10 border-emerald-500/20'
+                ? 'bg-gray-500/10 border-gray-500/20'
+                : 'bg-emerald-500/10 border-emerald-500/20'
                 }`}
             >
               <div className="flex items-center gap-3">
@@ -135,8 +141,8 @@ export function MysteryBoxInfo() {
                 </div>
               </div>
               <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${prize.isWon
-                  ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 }`}>
                 {prize.isWon ? 'GANHO' : 'DISPONÍVEL'}
               </div>

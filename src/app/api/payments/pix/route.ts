@@ -98,9 +98,9 @@ export async function POST(req: Request) {
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
     // 7. Criar pagamento PIX no Mercado Pago
-    // Modelo Marketplace com custódia: todo o dinheiro entra na conta da plataforma.
+    // Usa o token do lojista se conectado (OAuth), se não, usa o da plataforma temporariamente
     const mpConfig = new MercadoPagoConfig({
-      accessToken: process.env.MP_ACCESS_TOKEN!,
+      accessToken: tenant.mpAccessToken || process.env.MP_ACCESS_TOKEN!,
     });
     const mpPayment = new Payment(mpConfig);
 
@@ -134,9 +134,15 @@ export async function POST(req: Request) {
       },
     };
 
+    // Se estiver usando o token do tenant via OAuth, aplica a taxa da plataforma
+    if (tenant.mpAccessToken) {
+      const platformFeePercentage = Number(process.env.PLATFORM_FEE_PERCENTAGE || 20);
+      mpBody.application_fee = Number((totalAmount * (platformFeePercentage / 100)).toFixed(2));
+    }
+
     // notification_url só é válida em produção (MP rejeita URLs localhost)
     if (!baseUrl.includes('localhost')) {
-      mpBody.notification_url = `${baseUrl}/api/payments/webhooks/mercadopago`;
+      mpBody.notification_url = `${baseUrl}/api/webhooks/mercadopago`;
     }
 
     console.log('[MP] Criando pagamento PIX...');

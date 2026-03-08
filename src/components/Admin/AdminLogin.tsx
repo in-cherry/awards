@@ -49,7 +49,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
             <div className="space-y-2">
               <h1 className="text-3xl font-black text-white tracking-tight">
-                Painel Administrativo
+                Painel de Controle
               </h1>
               <p className="text-sm text-gray-400 font-medium">
                 Acesso restrito apenas para administradores
@@ -62,11 +62,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
             <div className="space-y-4">
               <div className="space-y-3">
                 <label className="block text-xs text-gray-400 font-bold uppercase tracking-widest">
-                  Email Administrativo
+                  Email
                 </label>
                 <input
                   type="email"
-                  placeholder="admin@empresa.com"
+                  placeholder="seu@email.com"
                   value={adminUsername}
                   onChange={(e) => setAdminUsername(e.target.value)}
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-4 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none focus:bg-black/30 transition-all"
@@ -120,31 +120,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               </button>
             </div>
           </form>
-
-          {/* Footer Info */}
-          <div className="pt-6 border-t border-white/5">
-            <div className="text-center space-y-2">
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                🔒 Área Protegida
-              </p>
-              <p className="text-xs text-gray-600">
-                Este painel permite gerenciar rifas, visualizar estatísticas e configurar sua plataforma
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Security Notice */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 text-center"
-        >
-          <p className="text-xs text-gray-600 flex items-center justify-center gap-2">
-            <Lock size={12} />
-            Conexão segura e criptografada
-          </p>
         </div>
       </motion.div>
     </div>

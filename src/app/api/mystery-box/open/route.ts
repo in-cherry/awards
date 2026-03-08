@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Caixa inválida' }, { status: 400 });
     }
 
-    const alreadyOpened = payment.mysteryWon.some((w) => w.boxIndex === boxIndex);
+    const alreadyOpened = payment.mysteryWon.some((w: any) => w.boxIndex === boxIndex);
     if (alreadyOpened) {
       return NextResponse.json({ error: 'Esta caixa já foi aberta' }, { status: 400 });
     }
@@ -108,7 +108,8 @@ export async function POST(req: Request) {
     const luckyTicket = payment.tickets[0]?.number ?? 0;
 
     // 6. Transação: criar winner + decrementar estoque do prêmio
-    const winner = await prisma.$transaction(async (tx) => {
+    // Registra ganho
+    const winner = await prisma.$transaction(async (tx: any) => {
       // Decrementar remaining
       await tx.mysteryPrize.update({
         where: { id: availablePrize.id },
