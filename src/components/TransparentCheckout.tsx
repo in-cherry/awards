@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { CreditCard, Smartphone, Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check, RefreshCw, CheckCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useApp } from '@/contexts/AppContext';
 
 interface TransparentCheckoutProps {
   paymentData: {
@@ -18,6 +20,10 @@ interface TransparentCheckoutProps {
 
 export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }: TransparentCheckoutProps) {
   const [copied, setCopied] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'approved' | 'cancelled'>('pending');
+  const router = useRouter();
+  const { tenant } = useApp();
 
   const handleCopyPix = async () => {
     try {
@@ -29,6 +35,28 @@ export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }:
     }
   };
 
+  const checkPaymentStatus = async () => {
+    setChecking(true);
+    try {
+      const response = await fetch(`/api/payments/${paymentData.paymentId}/status`);
+      const data = await response.json();
+
+      if (data.status === 'APPROVED') {
+        setPaymentStatus('approved');
+        setTimeout(() => {
+          onPaymentComplete?.();
+          router.push(`/${tenant?.slug}/my-tickets`);
+        }, 2000);
+      } else if (data.status === 'CANCELLED') {
+        setPaymentStatus('cancelled');
+      }
+    } catch (error) {
+      console.error('Erro ao verificar pagamento:', error);
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -36,11 +64,35 @@ export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }:
     }).format(amount);
   };
 
+  // Auto-check payment status periodically
+  useEffect(() => {
+    const interval = setInterval(checkPaymentStatus, 5000); // Check every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  if (paymentStatus === 'approved') {
+    return (
+      <div className="bg-white/5 backdrop-blur-md border border-emerald-500/30 rounded-3xl p-8 space-y-6 max-w-md mx-auto">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle size={32} className="text-white" />
+          </div>
+          <h3 className="text-xl font-black text-emerald-400 uppercase tracking-tight">Pagamento Aprovado!</h3>
+          <p className="text-sm text-gray-300">Redirecionando para seus bilhetes...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-8 space-y-6 max-w-md mx-auto">
       <div className="text-center space-y-2">
         <h3 className="text-xl font-black text-white uppercase tracking-tight">Finalizar Pagamento</h3>
         <p className="text-2xl font-black text-emerald-400">{formatCurrency(paymentData.amount)}</p>
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+          <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">Aguardando pagamento</p>
+        </div>
       </div>
 
       <motion.div className="space-y-6">
@@ -93,11 +145,12 @@ export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }:
           </button>
         )}
         <button
-          onClick={() => window.open(`/api/payments/${paymentData.paymentId}/status`, '_blank')}
-          className="flex-1 bg-blue-500 hover:bg-blue-400 text-white font-black py-4 rounded-2xl uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+          onClick={checkPaymentStatus}
+          disabled={checking}
+          className="flex-1 bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-white font-black py-4 rounded-2xl uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
         >
-          <ExternalLink size={16} />
-          Verificar
+          <RefreshCw size={16} className={checking ? 'animate-spin' : ''} />
+          {checking ? 'Verificando...' : 'Atualizar'}
         </button>
       </div>
     </div>

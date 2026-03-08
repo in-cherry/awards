@@ -93,16 +93,12 @@ export async function POST(req: Request) {
       ? getBoxesForTickets(ticketCount, mysteryBoxConfig.rules)
       : 0;
 
-    // 6. Configurar URL base para notifications
+    // 6. Configurar URL base
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
-    console.log('[DEBUG] baseUrl:', baseUrl);
-    console.log('[DEBUG] notification_url:', `${baseUrl}/api/payments/webhooks/mercadopago`);
-
-    // 7. Gerar pagamento PIX no Mercado Pago
-    // Split: se o tenant tem mpRecipientId, direcionamos parte para ele baseado na configuração
-    const platformFeePercentage = Number(process.env.PLATFORM_FEE_PERCENTAGE) || 20;
+    // 7. Criar pagamento PIX no Mercado Pago
+    // Modelo Marketplace com custódia: todo o dinheiro entra na conta da plataforma.
     const mpConfig = new MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN!,
     });
@@ -124,30 +120,29 @@ export async function POST(req: Request) {
           number: clientData.cpf,
         },
       },
-      description: `${ticketCount} bilhete${ticketCount > 1 ? 's' : ''} — ${raffle.title}`,
+      description: `${ticketCount} bilhete${ticketCount > 1 ? 's' : ''} — ${raffle.title} (${tenant.name})`,
+      statement_descriptor: tenant.name.substring(0, 13),
       external_reference: payment.id,
       metadata: {
         payment_db_id: payment.id,
         raffle_id: raffle.id,
         tenant_id: tenant.id,
+        tenant_slug: tenant.slug,
         ticket_count: ticketCount,
         boxes_granted: boxesGranted,
+        total_amount: totalAmount,
       },
     };
 
-    // Só adiciona notification_url se não for localhost
+    // notification_url só é válida em produção (MP rejeita URLs localhost)
     if (!baseUrl.includes('localhost')) {
       mpBody.notification_url = `${baseUrl}/api/payments/webhooks/mercadopago`;
     }
 
-    // Split: se tenant tem conta MP conectada, cobrar application_fee baseado na configuração
-    if (tenant.mpRecipientId) {
-      const applicationFee = parseFloat((totalAmount * (platformFeePercentage / 100)).toFixed(2));
-      mpBody.application_fee = applicationFee;
-      mpBody.collector_id = Number(tenant.mpRecipientId);
-    }
-
+    console.log('[MP] Criando pagamento PIX...');
     const mpResult = await mpPayment.create({ body: mpBody });
+
+    console.log(`[MP] Pagamento criado — ID: ${mpResult.id} | Status: ${mpResult.status}`);
 
     const qrCode =
       (mpResult as unknown as { point_of_interaction?: { transaction_data?: { qr_code?: string } } })
@@ -156,13 +151,22 @@ export async function POST(req: Request) {
       (mpResult as unknown as { point_of_interaction?: { transaction_data?: { qr_code_base64?: string } } })
         ?.point_of_interaction?.transaction_data?.qr_code_base64 ?? '';
 
-    // 7. Atualizar pagamento com dados do MP
+    if (!qrCode || !qrCodeBase64) {
+      throw new Error('QR Code PIX não foi gerado pelo Mercado Pago');
+    }
+
+    // 8. Atualizar pagamento com dados do MP
     await prisma.payment.update({
       where: { id: payment.id },
       data: {
         externalId: String(mpResult.id),
         qrCode,
         qrCodeBase64,
+        metadata: {
+          mp_id: mpResult.id,
+          mp_status: mpResult.status,
+          mp_date_created: mpResult.date_created,
+        },
       },
     });
 
@@ -172,10 +176,35 @@ export async function POST(req: Request) {
       qrCode,
       qrCodeBase64,
       amount: totalAmount,
+      expiresAt: mpResult.date_of_expiration,
+      details: {
+        mercadoPagoId: mpResult.id,
+        status: mpResult.status,
+        ticketCount,
+        raffleTitle: raffle.title,
+        clientName: client.name,
+        mysteryBoxes: boxesGranted,
+      },
     });
   } catch (error) {
-    console.error('[API PIX] Erro:', error);
-    return NextResponse.json({ error: 'Erro interno ao gerar pagamento' }, { status: 500 });
+    console.error('[API PIX] Erro detalhado:', error);
+
+    // Melhor tratamento de erros específicos do Mercado Pago
+    if (error && typeof error === 'object' && 'cause' in error) {
+      const mpError = (error as any).cause;
+      if (mpError && mpError.message) {
+        console.error('[MP Error]:', mpError.message);
+        return NextResponse.json({
+          error: 'Erro no Mercado Pago',
+          details: mpError.message
+        }, { status: 400 });
+      }
+    }
+
+    return NextResponse.json({
+      error: 'Erro interno ao gerar pagamento PIX',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, { status: 500 });
   }
 }
 

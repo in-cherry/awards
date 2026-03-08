@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ChevronRight, Phone } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
+import { saveSession } from '@/lib/session';
 
 export function LoginModal() {
   const {
@@ -127,10 +128,19 @@ export function LoginModal() {
     const userCleanPhone = loginUser.phone?.replace(/\D/g, '') || '';
 
     if (cleanPhone === userCleanPhone) {
-      setUser(loginUser);
+      const userData = {
+        name: loginUser.name,
+        email: loginUser.email,
+        phone: loginUser.phone,
+        cpf: loginUser.cpf,
+      };
+      setUser(userData);
+      saveSession(userData);
       setIsLoginModalOpen(false);
       setLoginPhoneError('');
-      router.push(`/${tenant?.slug}/my-tickets`);
+      // Redireciona com o CPF na URL para carregar os bilhetes direto
+      const cleanCpf = loginUser.cpf?.replace(/\D/g, '') || '';
+      router.push(`/${tenant?.slug}/my-tickets?cpf=${cleanCpf}`);
     } else {
       setLoginPhoneError('Telefone incorreto.');
     }
@@ -139,7 +149,7 @@ export function LoginModal() {
   return (
     <AnimatePresence>
       {isLoginModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-70 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -223,6 +223,12 @@ model Payment {
   // Caixas Misteriosas concedidas neste pedido (calculado no webhook)
   boxesGranted Int @default(0)
 
+  // Metadata adicional para armazenar informações do Mercado Pago e split payment
+  metadata Json?
+
+  // Campo para armazenar quando o pagamento foi processado
+  processedAt DateTime?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
   raffleId String

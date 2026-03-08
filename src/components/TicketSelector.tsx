@@ -4,9 +4,6 @@ import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { motion } from 'motion/react';
 import { ShoppingCart, Plus, Minus, Gift } from 'lucide-react';
-import { PurchaseModal } from '@/components/Modals/PurchaseModal';
-import { LoginModal } from '@/components/Modals/LoginModal';
-import { MysteryBoxModal } from '@/components/Modals/MysteryBoxModal';
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -14,7 +11,7 @@ const itemVariants = {
 };
 
 export function TicketSelector() {
-  const { raffle, ticketCount, setTicketCount, setIsModalOpen, setIsNewUser, setCpf, setCpfError, setPhoneError, setFormData } = useApp();
+  const { raffle, ticketCount, setTicketCount, setIsModalOpen, setIsNewUser, setCpf, setCpfError, setPhoneError, setFormData, user, setIsPhoneConfirmModalOpen } = useApp();
 
   if (!raffle) return null;
 
@@ -31,6 +28,12 @@ export function TicketSelector() {
   };
 
   const handleReserve = () => {
+    // Usuário com sessão ativa: solicitar confirmação de telefone
+    if (user) {
+      setIsPhoneConfirmModalOpen(true);
+      return;
+    }
+    // Usuário sem sessão: fluxo normal com CPF
     setIsModalOpen(true);
     setIsNewUser(null);
     setCpf('');
@@ -137,10 +140,6 @@ export function TicketSelector() {
           RESERVAR BILHETES
         </motion.button>
       </div>
-
-      <PurchaseModal />
-      <LoginModal />
-      <MysteryBoxModal />
     </motion.section>
   );
 }

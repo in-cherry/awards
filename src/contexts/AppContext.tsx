@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getSession, saveSession } from '@/lib/session';
 
 type Tenant = {
   id: string;
@@ -94,6 +95,11 @@ interface AppContextType {
   setIsLoginStepPhone: React.Dispatch<React.SetStateAction<boolean>>;
   phoneError: string;
   setPhoneError: React.Dispatch<React.SetStateAction<string>>;
+  // Phone confirmation modal (compra com sessão ativa)
+  isPhoneConfirmModalOpen: boolean;
+  setIsPhoneConfirmModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  // Persistência de sessão
+  saveUserSession: (user: { id?: string; name: string; email: string; phone?: string; cpf?: string; role?: 'USER' | 'ADMIN' }) => void;
   // Checkout states
   isCheckoutModalOpen: boolean;
   setIsCheckoutModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -143,7 +149,21 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
   const [loginUser, setLoginUser] = useState<any>(null);
   const [isLoginStepPhone, setIsLoginStepPhone] = useState(false);
   const [phoneError, setPhoneError] = useState('');
+  const [isPhoneConfirmModalOpen, setIsPhoneConfirmModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+
+  // Carrega sessão do localStorage na montagem
+  useEffect(() => {
+    const session = getSession();
+    if (session) {
+      setUser(session);
+    }
+  }, []);
+
+  const saveUserSession = (userData: Parameters<typeof saveSession>[0]) => {
+    saveSession(userData);
+    setUser(userData);
+  };
   const [checkoutPaymentData, setCheckoutPaymentData] = useState<{
     paymentId: string;
     qrCode: string;
@@ -176,6 +196,8 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
       loginUser, setLoginUser,
       isLoginStepPhone, setIsLoginStepPhone,
       phoneError, setPhoneError,
+      isPhoneConfirmModalOpen, setIsPhoneConfirmModalOpen,
+      saveUserSession,
       isCheckoutModalOpen, setIsCheckoutModalOpen,
       checkoutPaymentData, setCheckoutPaymentData,
     }}>

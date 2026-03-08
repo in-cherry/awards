@@ -25,7 +25,7 @@ async function main() {
       email: "admin@trgustavin.com",
       password: hashedPassword,
       name: "Administrador TRGustavin",
-      cpf: "12345678900",
+      cpf: "12345678909",
       phone: "11999999999",
       role: "ADMIN"
     }
@@ -150,7 +150,7 @@ async function main() {
   const client3 = await prisma.client.create({
     data: {
       name: "Jeniffer Pereira Martins",
-      cpf: "45678912301",
+      cpf: "45678912364",
       phone: "11923456789",
       email: "jeniffer@email.com",
       tenant: {

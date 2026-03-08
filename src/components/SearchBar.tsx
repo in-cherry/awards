@@ -4,6 +4,7 @@ import React from 'react';
 import { Search } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useApp } from '@/contexts/AppContext';
+import { useRouter } from 'next/navigation';
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -12,6 +13,8 @@ const itemVariants = {
 
 export function SearchBar() {
   const { 
+    user,
+    tenant,
     setIsLoginModalOpen, 
     setLoginCpf, 
     setLoginCpfError, 
@@ -20,8 +23,14 @@ export function SearchBar() {
     setIsLoginStepPhone, 
     setLoginUser 
   } = useApp();
+  const router = useRouter();
 
   const handleOpenLogin = () => {
+    // Se o usuário já tem sessão válida, redireciona direto para os bilhetes
+    if (user?.cpf) {
+      router.push(`/${tenant?.slug}/my-tickets?cpf=${user.cpf.replace(/\D/g, '')}`);
+      return;
+    }
     setIsLoginModalOpen(true);
     setLoginCpf('');
     setLoginCpfError('');

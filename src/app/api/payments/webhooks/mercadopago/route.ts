@@ -11,19 +11,26 @@ const mpPayment = new Payment(mpConfig);
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    console.log('[WEBHOOK] Recebido:', JSON.stringify(body, null, 2));
 
     // MP envia notificação de payment.updated ou tipo "payment"
     const paymentId: string | undefined =
       body?.data?.id ?? body?.id;
 
     if (!paymentId) {
+      console.log('[WEBHOOK] ID de pagamento não encontrado');
       return NextResponse.json({ received: true });
     }
 
+    console.log(`[WEBHOOK] Processando pagamento MP ID: ${paymentId}`);
+
     // Buscar status atualizado diretamente na API do MP
     const mpData = await mpPayment.get({ id: String(paymentId) });
+    console.log(`[WEBHOOK] Status MP: ${mpData.status}`);
+    console.log(`[WEBHOOK] Valor MP: R$ ${mpData.transaction_amount}`);
 
     if (mpData.status !== 'approved') {
+      console.log(`[WEBHOOK] Pagamento não aprovado (${mpData.status}) - ignorando`);
       return NextResponse.json({ received: true });
     }
 
@@ -31,6 +38,8 @@ export async function POST(req: Request) {
     const externalRef: string =
       (mpData as unknown as { external_reference?: string }).external_reference ??
       String(mpData.id);
+
+    console.log(`[WEBHOOK] External reference: ${externalRef}`);
 
     const payment = await prisma.payment.findFirst({
       where: {
@@ -40,21 +49,47 @@ export async function POST(req: Request) {
         ],
       },
       include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
         raffle: {
           select: {
             id: true,
+            title: true,
             totalNumbers: true,
             mysteryBoxEnabled: true,
             mysteryBoxConfig: true,
           },
         },
+        client: {
+          select: {
+            id: true,
+            name: true,
+            cpf: true,
+          },
+        },
       },
     });
 
-    if (!payment || payment.status === 'APPROVED') {
-      // Já processado ou não encontrado
+    if (!payment) {
+      console.error(`[WEBHOOK] Pagamento não encontrado no DB para MP ID: ${paymentId}`);
       return NextResponse.json({ received: true });
     }
+
+    if (payment.status === 'APPROVED') {
+      console.log(`[WEBHOOK] Pagamento já processado: ${payment.id}`);
+      return NextResponse.json({ received: true });
+    }
+
+    console.log(`[WEBHOOK] Processando pagamento DB ID: ${payment.id}`);
+    console.log(`[WEBHOOK] Cliente: ${payment.client.name} (${payment.client.cpf})`);
+    console.log(`[WEBHOOK] Rifa: ${payment.raffle.title}`);
+    console.log(`[WEBHOOK] Tenant: ${payment.tenant.name} (${payment.tenant.slug})`);
+    console.log(`[WEBHOOK] Bilhetes: ${payment.ticketCount}`);
 
     // =====================================================
     // ALOCAÇÃO EFICIENTE DE TICKETS
@@ -97,12 +132,15 @@ export async function POST(req: Request) {
       number: startNumber + i,
     }));
 
+    console.log(`[WEBHOOK] Alocando bilhetes: ${startNumber} a ${startNumber + ticketCount - 1}`);
+
     // Calcular caixas misteriosas concedidas
     let boxesGranted = 0;
     if (payment.raffle.mysteryBoxEnabled) {
       const config = parseMysteryBoxConfig(payment.raffle.mysteryBoxConfig);
       if (config) {
         boxesGranted = getBoxesForTickets(ticketCount, config.rules);
+        console.log(`[WEBHOOK] Mystery boxes concedidas: ${boxesGranted}`);
       }
     }
 
@@ -115,15 +153,44 @@ export async function POST(req: Request) {
           status: 'APPROVED',
           externalId: String(mpData.id),
           boxesGranted,
+          processedAt: new Date(),
+          metadata: {
+            ...((payment.metadata as any) || {}),
+            webhook_processed_at: new Date().toISOString(),
+            mp_final_status: mpData.status,
+            mp_final_amount: mpData.transaction_amount,
+            tickets_allocated: {
+              start: startNumber,
+              end: startNumber + ticketCount - 1,
+              total: ticketCount,
+            },
+          },
         },
       }),
     ]);
 
-    return NextResponse.json({ received: true });
+    console.log(`[WEBHOOK] ✅ Pagamento processado com sucesso!`);
+    console.log(`[WEBHOOK] - ID: ${payment.id}`);
+    console.log(`[WEBHOOK] - Cliente: ${payment.client.name}`);
+    console.log(`[WEBHOOK] - Bilhetes: ${startNumber} a ${startNumber + ticketCount - 1}`);
+    console.log(`[WEBHOOK] - Mystery Boxes: ${boxesGranted}`);
+
+    return NextResponse.json({ received: true, processed: true });
   } catch (error) {
-    console.error('[Webhook MP] Erro:', error);
+    console.error('[Webhook MP] Erro detalhado:', error);
+
+    // Log mais detalhado do erro
+    if (error instanceof Error) {
+      console.error('[Webhook MP] Message:', error.message);
+      console.error('[Webhook MP] Stack:', error.stack);
+    }
+
     // Retornar 200 mesmo em erro para evitar reenvio infinito do MP
-    return NextResponse.json({ received: true });
+    return NextResponse.json({
+      received: true,
+      error: true,
+      message: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
   }
 }
 

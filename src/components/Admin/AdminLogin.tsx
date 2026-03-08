@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Lock } from 'lucide-react';
+import { Lock, ArrowLeft, Shield } from 'lucide-react';
 
 interface AdminLoginProps {
   adminUsername: string;
@@ -22,58 +22,130 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   setIsAdmin
 }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex items-center justify-center p-6">
+      {/* Background Effects */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
+      </div>
+
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-md bg-white/5 border border-white/10 rounded-[40px] p-10 space-y-8 backdrop-blur-xl"
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="relative w-full max-w-md"
       >
-        <div className="text-center space-y-2">
-          <div className="w-20 h-20 bg-emerald-500/20 rounded-[32px] flex items-center justify-center mx-auto mb-6">
-            <Lock className="text-emerald-400" size={40} />
+        {/* Card */}
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-8 space-y-8 shadow-2xl">
+          {/* Header */}
+          <div className="text-center space-y-6">
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mx-auto border border-emerald-500/20">
+                <Shield className="text-emerald-400" size={32} />
+              </div>
+              <div className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
+                <Lock size={16} className="text-white" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-3xl font-black text-white tracking-tight">
+                Painel Administrativo
+              </h1>
+              <p className="text-sm text-gray-400 font-medium">
+                Acesso restrito apenas para administradores
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl font-black font-display tracking-tight text-white">Acesso Restrito</h1>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Informe a senha administrativa</p>
+
+          {/* Form */}
+          <form onSubmit={handleAdminLogin} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <label className="block text-xs text-gray-400 font-bold uppercase tracking-widest">
+                  Email Administrativo
+                </label>
+                <input
+                  type="email"
+                  placeholder="admin@empresa.com"
+                  value={adminUsername}
+                  onChange={(e) => setAdminUsername(e.target.value)}
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-4 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none focus:bg-black/30 transition-all"
+                  required
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-xs text-gray-400 font-bold uppercase tracking-widest">
+                  Senha de Acesso
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••••"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-4 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none focus:bg-black/30 transition-all"
+                  required
+                />
+              </div>
+
+              {adminError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center"
+                >
+                  <p className="text-red-400 text-sm font-bold">⚠️ {adminError}</p>
+                </motion.div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <motion.button
+                type="submit"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                <Shield size={16} />
+                Acessar Dashboard
+              </motion.button>
+
+              <button
+                type="button"
+                onClick={() => setIsAdmin(false)}
+                className="w-full text-gray-400 hover:text-white transition-colors py-3 font-medium flex items-center justify-center gap-2 text-sm"
+              >
+                <ArrowLeft size={16} />
+                Voltar ao Site Principal
+              </button>
+            </div>
+          </form>
+
+          {/* Footer Info */}
+          <div className="pt-6 border-t border-white/5">
+            <div className="text-center space-y-2">
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                🔒 Área Protegida
+              </p>
+              <p className="text-xs text-gray-600">
+                Este painel permite gerenciar rifas, visualizar estatísticas e configurar sua plataforma
+              </p>
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleAdminLogin} className="space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest ml-1">Email</label>
-              <input
-                type="email"
-                placeholder="Digite o email"
-                value={adminUsername}
-                onChange={(e) => setAdminUsername(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-emerald-500/50 transition-all text-center text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest ml-1">Senha</label>
-              <input
-                type="password"
-                placeholder="Digite a senha"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-emerald-500/50 transition-all text-center text-white"
-              />
-            </div>
-            {adminError && <p className="text-red-400 text-[10px] font-bold text-center uppercase tracking-widest">{adminError}</p>}
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black py-5 rounded-2xl shadow-[0_20px_40px_rgba(16,185,129,0.3)] transition-all active:scale-[0.98] uppercase tracking-widest text-xs"
-          >
-            Entrar no Painel
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsAdmin(false)}
-            className="w-full text-gray-500 text-[10px] font-black hover:text-white transition-colors uppercase tracking-widest"
-          >
-            Voltar para o site
-          </button>
-        </form>
+        {/* Security Notice */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-6 text-center"
+        >
+          <p className="text-xs text-gray-600 flex items-center justify-center gap-2">
+            <Lock size={12} />
+            Conexão segura e criptografada
+          </p>
+        </div>
       </motion.div>
     </div>
   );
