@@ -164,7 +164,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             )}
             <div>
-              <h1 className="text-xl font-black text-white">Dashboard Administrativo</h1>
+              <h1 className="text-xl font-black text-white">Painel de Controle</h1>
               <p className="text-xs text-emerald-400 font-bold uppercase tracking-widest">
                 {tenant.name}
               </p>
@@ -611,8 +611,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </label>
                       <input
                         type="text"
-                        placeholder="Nome do Organizador"
-                        value={ownerName}
+                        placeholder={tenant.owner?.name || "Nome do Organizador"}
+                        value={ownerName || ''}
                         onChange={(e) => setOwnerName(e.target.value)}
                         className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none transition-all"
                       />
@@ -638,8 +638,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                         <input
                           type="text"
-                          placeholder="URL do Avatar"
-                          value={avatarUrl}
+                          placeholder={tenant.owner?.avatarUrl || "URL do Avatar (https://...)"}
+                          value={avatarUrl || ''}
                           onChange={(e) => setAvatarUrl(e.target.value)}
                           className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none transition-all"
                         />
@@ -654,60 +654,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </label>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6">
-                <h3 className="text-lg font-black text-white mb-4">Visão Inicial do Site</h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setHomeView('RAFFLE')}
-                      className={`p-6 rounded-2xl border flex flex-col items-center justify-center gap-3 transition-all ${homeView === 'RAFFLE' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-black/20 border-white/10 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                    >
-                      <div className="w-16 h-10 bg-current opacity-20 rounded shadow-md mb-2"></div>
-                      <span className="font-black text-lg">Destaque de Rifa</span>
-                      <span className="text-xs text-center font-medium opacity-80">Abre direto na Rifa Ativa principal com modal de compra</span>
-                    </button>
-                    <button
-                      onClick={() => setHomeView('LIST')}
-                      className={`p-6 rounded-2xl border flex flex-col items-center justify-center gap-3 transition-all ${homeView === 'LIST' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-black/20 border-white/10 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                    >
-                      <div className="w-16 h-10 flex gap-2 mb-2">
-                        <div className="flex-1 bg-current opacity-20 rounded shadow-sm"></div>
-                        <div className="flex-1 bg-current opacity-20 rounded shadow-sm"></div>
-                      </div>
-                      <span className="font-black text-lg">Lista de Rifas</span>
-                      <span className="text-xs text-center font-medium opacity-80">Exibe todas as rifas em formato de cards para escolha</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6">
-                <h3 className="text-lg font-black text-white mb-4">Visão Inicial do Site</h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setHomeView('RAFFLE')}
-                      className={`p-6 rounded-2xl border flex flex-col items-center justify-center gap-3 transition-all ${homeView === 'RAFFLE' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-black/20 border-white/10 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                    >
-                      <div className="w-16 h-10 bg-current opacity-20 rounded shadow-md mb-2"></div>
-                      <span className="font-black text-lg">Destaque de Rifa</span>
-                      <span className="text-xs text-center font-medium opacity-80">Abre direto na Rifa Ativa principal com modal de compra</span>
-                    </button>
-                    <button
-                      onClick={() => setHomeView('LIST')}
-                      className={`p-6 rounded-2xl border flex flex-col items-center justify-center gap-3 transition-all ${homeView === 'LIST' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-black/20 border-white/10 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                    >
-                      <div className="w-16 h-10 flex gap-2 mb-2">
-                        <div className="flex-1 bg-current opacity-20 rounded shadow-sm"></div>
-                        <div className="flex-1 bg-current opacity-20 rounded shadow-sm"></div>
-                      </div>
-                      <span className="font-black text-lg">Lista de Rifas</span>
-                      <span className="text-xs text-center font-medium opacity-80">Exibe todas as rifas em formato de cards para escolha</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -824,18 +770,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   {/* Mercado Pago Setup */}
                   <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6 md:p-8">
-                    <h3 className="text-xl font-black text-white mb-6 uppercase tracking-widest flex items-center gap-3">
+                    <h3 className="text-lg font-black text-white mb-4 uppercase tracking-widest flex items-center gap-3">
                       Integração Financeira
                     </h3>
                     <div className="space-y-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border border-white/10 rounded-xl bg-black/20">
-                        <div>
-                          <p className="font-bold text-white text-lg">Mercado Pago</p>
-                          <p className="text-sm text-gray-400">Conecte sua conta para receber os pagamentos automaticamente com Split Seguro.</p>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 border border-[#009EE3]/20 rounded-2xl bg-[#009EE3]/5">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-[#009EE3]/10 flex items-center justify-center border border-[#009EE3]/20 shrink-0">
+                            <span className="text-2xl">🤝</span>
+                          </div>
+                          <div>
+                            <p className="font-bold text-white text-lg">Mercado Pago</p>
+                            <p className="text-sm text-[#009EE3]/80 font-medium">Conecte sua conta para receber os pagamentos automaticamente com Split Seguro.</p>
+                          </div>
                         </div>
                         <button
                           onClick={() => window.location.href = `/api/auth/mercadopago/connect?tenantId=${tenant.id}`}
-                          className="bg-[#009EE3]/10 hover:bg-[#009EE3]/20 border border-[#009EE3]/30 text-[#009EE3] px-6 py-3 rounded-xl font-black uppercase tracking-widest transition-all whitespace-nowrap"
+                          className="bg-[#009EE3] hover:bg-[#009EE3]/80 text-white shadow-lg shadow-[#009EE3]/20 px-6 py-3 rounded-xl font-black uppercase tracking-widest transition-all whitespace-nowrap"
                         >
                           Conectar Conta
                         </button>
@@ -850,30 +801,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       className="bg-emerald-500 hover:bg-emerald-400 text-white font-black px-6 py-3 rounded-xl text-xs uppercase tracking-widest transition-all disabled:opacity-50"
                     >
                       {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6">
-                <h3 className="text-lg font-black text-white mb-4">Preferências</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-white">Notificações por Email</p>
-                      <p className="text-sm text-gray-400">Receba alertas sobre vendas e status das rifas</p>
-                    </div>
-                    <button className="w-12 h-6 bg-emerald-500 rounded-full relative">
-                      <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 transition-all"></div>
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-white">Modo Escuro</p>
-                      <p className="text-sm text-gray-400">Aparência atual da interface</p>
-                    </div>
-                    <button className="w-12 h-6 bg-emerald-500 rounded-full relative">
-                      <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 transition-all"></div>
                     </button>
                   </div>
                 </div>
