@@ -153,10 +153,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <ChevronLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
           </button>
           <div className="flex items-center gap-3">
-            {tenant.logoUrl && (
+            {logoUrl && (
               <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500/30">
                 <Image
-                  src={tenant.logoUrl}
+                  src={logoUrl}
                   alt={`${tenant.name} logo`}
                   fill
                   className="object-cover"
@@ -667,10 +667,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         Logo da Empresa
                       </label>
                       <div className="flex items-center gap-4">
-                        {tenant.logoUrl ? (
+                        {logoUrl ? (
                           <div className="relative w-16 h-16 rounded-xl overflow-hidden border-2 border-white/10">
                             <Image
-                              src={tenant.logoUrl}
+                              src={logoUrl}
                               alt={`${tenant.name} logo`}
                               fill
                               className="object-cover"
@@ -706,10 +706,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         Favicon (Ícone da Aba)
                       </label>
                       <div className="flex items-center gap-4">
-                        {tenant.faviconUrl ? (
+                        {faviconUrl ? (
                           <div className="relative w-16 h-16 rounded-xl overflow-hidden border-2 border-white/10 bg-white">
                             <Image
-                              src={tenant.faviconUrl}
+                              src={faviconUrl}
                               alt={`${tenant.name} favicon`}
                               fill
                               className="object-contain"
