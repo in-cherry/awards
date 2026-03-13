@@ -7,7 +7,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const tenant = await prisma.tenant.findUnique({ where: { slug } })
   const tenantName = tenant ? tenant.name : slug;
-  const tenantFavicon = tenant?.faviconUrl || `/${slug}.ico`;
+  const tenantFavicon = tenant?.faviconUrl || `/icon.ico`;
 
   return {
     title: `Winzy | ${tenantName}`,
