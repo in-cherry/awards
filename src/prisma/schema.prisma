@@ -11,14 +11,14 @@ datasource db {
 // ==========================================
 
 model User {
-  id       String   @id @default(cuid())
-  name     String
-  email    String   @unique
-  password String // Para login de admin
-  phone    String?  @unique
-  cpf      String?  @unique
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String // Para login de admin
+  phone     String?  @unique
+  cpf       String?  @unique
   avatarUrl String?
-  role     UserRole @default(USER)
+  role      UserRole @default(USER)
 
   tenants Tenant[]
 
@@ -38,6 +38,9 @@ model Tenant {
   customDomain String? @unique
   logoUrl      String?
   faviconUrl   String?
+  instagramUrl String?
+  telegramUrl  String?
+  supportUrl   String?
   isActive     Boolean @default(true)
   homeView     String  @default("RAFFLE") // RAFFLE (mostra rifa principal) ou LIST (mostra lista de rifas)
 
@@ -65,13 +68,13 @@ model VerificationCode {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  phone     String
+  email     String
   code      String
   expiresAt DateTime
 
   createdAt DateTime @default(now())
 
-  @@index([tenantId, phone])
+  @@index([tenantId, email])
   @@map("verification_codes")
 }
 
@@ -112,6 +115,7 @@ model Raffle {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
+  slug         String
   title        String
   description  String?      @db.Text
   bannerUrl    String?
@@ -141,6 +145,7 @@ model Raffle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, slug])
   @@map("raffles")
 }
 
@@ -154,11 +159,13 @@ model Ticket {
   payment   Payment @relation(fields: [paymentId], references: [id])
 
   // Inteiro para máxima eficiência em rifas com até 1M+ números
-  number Int
+  number          Int
+  numberFormatted String @db.VarChar(6)
 
   createdAt DateTime @default(now())
 
   @@unique([raffleId, number])
+  @@unique([raffleId, numberFormatted])
   @@index([clientId])
   @@index([paymentId])
   @@map("tickets")

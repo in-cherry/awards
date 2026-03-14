@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Lock, ArrowLeft, Shield } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 interface AdminLoginProps {
   adminUsername: string;
@@ -61,29 +63,25 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           <form onSubmit={handleAdminLogin} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-3">
-                <label className="block text-xs text-gray-400 font-bold uppercase tracking-widest">
-                  Email
-                </label>
-                <input
+                <Input
+                  label="Email"
                   type="email"
+                  name="email"
                   placeholder="seu@email.com"
                   value={adminUsername}
                   onChange={(e) => setAdminUsername(e.target.value)}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-4 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none focus:bg-black/30 transition-all"
                   required
                 />
               </div>
 
               <div className="space-y-3">
-                <label className="block text-xs text-gray-400 font-bold uppercase tracking-widest">
-                  Senha de Acesso
-                </label>
-                <input
+                <Input
+                  label="Senha de Acesso"
                   type="password"
+                  name="password"
                   placeholder="••••••••••"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-4 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none focus:bg-black/30 transition-all"
                   required
                 />
               </div>
@@ -100,15 +98,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
             </div>
 
             <div className="space-y-3">
-              <motion.button
-                type="submit"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
-              >
-                <Shield size={16} />
-                Acessar Dashboard
-              </motion.button>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button type="submit" className="w-full text-sm py-4">
+                  <Shield size={16} />
+                  Acessar Dashboard
+                </Button>
+              </motion.div>
 
               <button
                 type="button"

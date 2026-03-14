@@ -49,6 +49,7 @@ async function main() {
   // 3. Criar rifa ativa
   const raffle = await prisma.raffle.create({
     data: {
+      slug: "titan-160-10-mil-no-pix",
       title: "TITAN 160 (10 mil no PIX)",
       description: "O vencedor será definido no primeiro prêmio da loteria federal!",
       bannerUrl: "https://www.trgustavin.com.br/play/views/theme/trgustavin/assets/img/acao/titan.png",
@@ -180,6 +181,7 @@ async function main() {
   for (let i = 1; i <= 400; i++) {
     ticketsClient1.push({
       number: i,
+      numberFormatted: String(i).padStart(6, '0'),
       raffleId: raffle.id,
       clientId: client1.id,
       paymentId: payment1.id
@@ -207,6 +209,7 @@ async function main() {
   for (let i = 401; i <= 3400; i++) {
     ticketsClient2.push({
       number: i,
+      numberFormatted: String(i).padStart(6, '0'),
       raffleId: raffle.id,
       clientId: client2.id,
       paymentId: payment2.id
@@ -234,6 +237,7 @@ async function main() {
   for (let i = 3401; i <= 4400; i++) {
     ticketsClient3.push({
       number: i,
+      numberFormatted: String(i).padStart(6, '0'),
       raffleId: raffle.id,
       clientId: client3.id,
       paymentId: payment3.id

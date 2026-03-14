@@ -6,7 +6,8 @@ import { getBoxesForTickets, parseMysteryBoxConfig } from '@/lib/mystery-box';
 
 const pixSchema = z.object({
   slug: z.string().min(1),
-  raffleId: z.string().min(1),
+  raffleRef: z.string().min(1).optional(),
+  raffleId: z.string().min(1).optional(),
   ticketCount: z.number().int().positive(),
   client: z.object({
     name: z.string().min(3),
@@ -28,7 +29,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const { slug, raffleId, ticketCount, client: clientData } = parsed.data;
+    const { slug, raffleRef, raffleId, ticketCount, client: clientData } = parsed.data;
+    const resolvedRaffleRef = raffleRef ?? raffleId;
+
+    if (!resolvedRaffleRef) {
+      return NextResponse.json({ error: 'Referencia da rifa obrigatoria' }, { status: 400 });
+    }
 
     // 1. Resolver tenant pelo slug
     const tenant = await prisma.tenant.findUnique({ where: { slug } });
@@ -38,7 +44,11 @@ export async function POST(req: Request) {
 
     // 2. Validar rifa
     const raffle = await prisma.raffle.findFirst({
-      where: { id: raffleId, tenantId: tenant.id, status: 'ACTIVE' },
+      where: {
+        tenantId: tenant.id,
+        status: 'ACTIVE',
+        OR: [{ id: resolvedRaffleRef }, { slug: resolvedRaffleRef }],
+      },
     });
     if (!raffle) {
       return NextResponse.json({ error: 'Rifa não encontrada ou encerrada' }, { status: 404 });

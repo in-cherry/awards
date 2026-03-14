@@ -23,7 +23,7 @@ interface PaymentData {
   boxesGranted: number;
   createdAt: string;
   raffle: { id: string; title: string; mysteryBoxEnabled: boolean };
-  tickets: number[];
+  tickets: string[];
   openedBoxes: OpenedBox[];
 }
 
@@ -41,20 +41,14 @@ interface MyTicketsClientProps {
 
 function RedirectToLogin({ slug }: { slug: string }) {
   const router = useRouter();
-  const { user, setIsLoginModalOpen } = useApp();
+  const { setIsLoginModalOpen, tenant } = useApp();
 
   React.useEffect(() => {
-    if (user?.cpf) {
-      const digits = user.cpf.replace(/\D/g, '');
-      if (digits.length === 11) {
-        router.replace(`/${slug}/meus-bilhetes?cpf=${digits}`);
-      }
-    } else {
-      // Unauthenticated -> back to slug and open Login
-      setIsLoginModalOpen(true);
-      router.replace(`/${slug}`);
-    }
-  }, [user, router, slug, setIsLoginModalOpen]);
+    // Sessao valida agora depende de cookie httpOnly no servidor.
+    // Sem sessao, voltamos para a home do tenant e abrimos o login modal.
+    setIsLoginModalOpen(true);
+    router.replace(`/${slug}`);
+  }, [router, slug, setIsLoginModalOpen]);
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
@@ -66,13 +60,14 @@ function RedirectToLogin({ slug }: { slug: string }) {
         </div>
       </div>
       <div className="p-4 w-full max-w-2xl mx-auto">
-        <Footer />
+        <Footer instagramUrl={tenant?.instagramUrl} telegramUrl={tenant?.telegramUrl} supportUrl={tenant?.supportUrl} />
       </div>
     </div>
   );
 }
 
 export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: MyTicketsClientProps) {
+  const { tenant } = useApp();
   const [payments, setPayments] = useState<PaymentData[]>(initialData?.payments ?? []);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [openingBox, setOpeningBox] = useState<string | null>(null); // paymentId:boxIndex
@@ -100,6 +95,10 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
         const data = await res.json();
 
         if (res.ok) {
+          const openedBox = data.openedBox as
+            | { id: string; boxIndex: number; prizeId: string; prizeName: string }
+            | undefined;
+
           setBoxResult({
             paymentId: payment.id,
             boxIndex,
@@ -107,35 +106,15 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
             prizeName: data.prize?.name,
           });
 
-          // Atualizar estado local imediatamente
-          if (data.won && data.prize) {
+          if (openedBox) {
             setPayments((prev) =>
               prev.map((p) =>
                 p.id === payment.id
                   ? {
                     ...p,
                     openedBoxes: [
-                      ...p.openedBoxes,
-                      {
-                        id: data.winnerId,
-                        boxIndex,
-                        prizeId: data.prize.id,
-                        prizeName: data.prize.name,
-                      },
-                    ],
-                  }
-                  : p
-              )
-            );
-          } else {
-            setPayments((prev) =>
-              prev.map((p) =>
-                p.id === payment.id
-                  ? {
-                    ...p,
-                    openedBoxes: [
-                      ...p.openedBoxes,
-                      { id: `no-prize-${boxIndex}`, boxIndex, prizeId: '', prizeName: '' },
+                      ...p.openedBoxes.filter((box) => box.boxIndex !== openedBox.boxIndex),
+                      openedBox,
                     ],
                   }
                   : p
@@ -168,7 +147,7 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
           </div>
         </div>
         <div className="p-4 w-full max-w-2xl mx-auto">
-          <Footer />
+          <Footer instagramUrl={tenant?.instagramUrl} telegramUrl={tenant?.telegramUrl} supportUrl={tenant?.supportUrl} />
         </div>
       </div>
     );
@@ -339,7 +318,7 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
                                   key={num}
                                   className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400"
                                 >
-                                  {String(num).padStart(6, '0')}
+                                  {num}
                                 </div>
                               ))}
                               {payment.tickets.length > 200 && (
@@ -360,7 +339,7 @@ export function MyTicketsClient({ slug, initialData, notFound: cpfNotFound }: My
         )}
       </main>
 
-      <div className="max-w-2xl mx-auto px-4 pb-8"><TrustBadges /><Footer /></div>
+      <div className="max-w-2xl mx-auto px-4 pb-8"><TrustBadges /><Footer instagramUrl={tenant?.instagramUrl} telegramUrl={tenant?.telegramUrl} supportUrl={tenant?.supportUrl} /></div>
     </div>
   );
 }

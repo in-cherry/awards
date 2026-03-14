@@ -38,6 +38,7 @@ export async function GET(
           select: {
             id: true,
             number: true,
+            numberFormatted: true,
           },
         },
       },
@@ -78,6 +79,7 @@ export async function GET(
       tickets: payment.tickets.map((ticket: any) => ({
         id: ticket.id,
         number: ticket.number,
+        numberFormatted: ticket.numberFormatted,
       })),
 
       // Status amigável para frontend

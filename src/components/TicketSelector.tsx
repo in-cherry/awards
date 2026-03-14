@@ -11,7 +11,7 @@ const itemVariants = {
 };
 
 export function TicketSelector() {
-  const { raffle, ticketCount, setTicketCount, setIsModalOpen, setIsNewUser, setCpf, setCpfError, setPhoneError, setFormData, user, setIsPhoneConfirmModalOpen } = useApp();
+  const { raffle, ticketCount, setTicketCount, setIsModalOpen, setIsNewUser, setCpf, setCpfError, setPhoneError, setFormData, user } = useApp();
 
   if (!raffle) return null;
 
@@ -28,9 +28,12 @@ export function TicketSelector() {
   };
 
   const handleReserve = () => {
-    // Usuário com sessão ativa: solicitar confirmação de telefone
+    // Usuario com sessao ativa: segue direto para compra
     if (user) {
-      setIsPhoneConfirmModalOpen(true);
+      setIsNewUser(false);
+      setCpf(user.cpf?.replace(/\D/g, '') || '');
+      setPhoneError('');
+      setIsModalOpen(true);
       return;
     }
     // Usuário sem sessão: fluxo normal com CPF

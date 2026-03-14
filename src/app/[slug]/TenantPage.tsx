@@ -15,7 +15,6 @@ import { Footer } from '@/components/Footer';
 import { LoginModal } from '@/components/Modals/LoginModal';
 import { PurchaseModal } from '@/components/Modals/PurchaseModal';
 import { MysteryBoxModal } from '@/components/Modals/MysteryBoxModal';
-import { PhoneConfirmModal } from '@/components/Modals/PhoneConfirmModal';
 import Link from 'next/link';
 
 const containerVariants = {
@@ -76,7 +75,11 @@ export default function TenantPage() {
 
             <TicketSelector />
             <TrustBadges />
-            <Footer />
+            <Footer
+              instagramUrl={tenant?.instagramUrl}
+              telegramUrl={tenant?.telegramUrl}
+              supportUrl={tenant?.supportUrl}
+            />
           </main>
         </motion.div>
       </AnimatePresence>
@@ -85,7 +88,6 @@ export default function TenantPage() {
       <LoginModal />
       <PurchaseModal />
       <MysteryBoxModal />
-      <PhoneConfirmModal />
     </div>
   );
 }

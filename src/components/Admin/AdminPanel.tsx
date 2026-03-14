@@ -37,27 +37,48 @@ interface AdminPanelProps {
     totalBuyers: number;
   };
   raffles: RaffleStats[];
+  initialAuthenticated?: boolean;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles, initialAuthenticated = false }) => {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialAuthenticated);
+  const [checkingSession, setCheckingSession] = useState(!initialAuthenticated);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   React.useEffect(() => {
-    const sessionKey = `admin_session_${tenant.slug}`;
-    const storedSession = localStorage.getItem(sessionKey);
-    if (storedSession) {
-      const { expiry } = JSON.parse(storedSession);
-      if (new Date().getTime() < expiry) {
-        setIsAuthenticated(true);
-      } else {
-        localStorage.removeItem(sessionKey);
-      }
+    if (initialAuthenticated) {
+      return;
     }
-  }, [tenant.slug]);
+
+    let active = true;
+
+    void fetch(`/api/admin/session?tenantSlug=${encodeURIComponent(tenant.slug)}`)
+      .then(async (response) => {
+        if (!active) return;
+        if (!response.ok) {
+          setIsAuthenticated(false);
+          return;
+        }
+        const data = await response.json();
+        setIsAuthenticated(Boolean(data?.authenticated));
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsAuthenticated(false);
+      })
+      .finally(() => {
+        if (active) {
+          setCheckingSession(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialAuthenticated, tenant.slug]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,12 +100,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }
       const data = await response.json();
 
       if (response.ok && data.success) {
-        const sessionData = {
-          expiry: new Date().getTime() + 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
-        };
-        localStorage.setItem(`admin_session_${tenant.slug}`, JSON.stringify(sessionData));
         setIsAuthenticated(true);
         setError('');
+        window.location.href = `/${tenant.slug}/admin`;
       } else {
         setError(data.error || 'Usuário ou senha incorretos');
       }
@@ -94,12 +112,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(`admin_session_${tenant.slug}`);
-    setIsAuthenticated(false);
-    setUsername('');
-    setPassword('');
-    router.push(`/${tenant.slug}`);
+    void fetch('/api/admin/logout', { method: 'POST' }).finally(() => {
+      setIsAuthenticated(false);
+      setUsername('');
+      setPassword('');
+      router.push(`/${tenant.slug}`);
+    });
   };
+
+  if (checkingSession) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-screen bg-[#0f172a] flex items-center justify-center"
+      >
+        <p className="text-white/70 text-sm uppercase tracking-widest font-black">Carregando sessao...</p>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

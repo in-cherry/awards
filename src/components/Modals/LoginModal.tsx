@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ChevronRight, Phone } from 'lucide-react';
+import { X, ChevronRight, Mail } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
 import { saveSession } from '@/lib/session';
@@ -12,9 +12,9 @@ export function LoginModal() {
     isLoginModalOpen, setIsLoginModalOpen,
     loginCpf, setLoginCpf,
     loginCpfError, setLoginCpfError,
-    loginPhone, setLoginPhone,
-    loginPhoneError, setLoginPhoneError,
-    isLoginStepPhone, setIsLoginStepPhone,
+    loginEmail, setLoginEmail,
+    loginEmailError, setLoginEmailError,
+    isLoginStepEmail, setIsLoginStepEmail,
     loginUser, setLoginUser,
     setUser,
     tenant
@@ -58,31 +58,15 @@ export function LoginModal() {
     return formatted;
   };
 
-  const formatPhone = (value: string) => {
-    const cleanValue = value.replace(/\D/g, '').substring(0, 11);
-    let formatted = cleanValue;
-    if (cleanValue.length > 0) {
-      formatted = `(${cleanValue.substring(0, 2)}`;
-    }
-    if (cleanValue.length > 2) {
-      formatted = `${formatted}) ${cleanValue.substring(2, 7)}`;
-    }
-    if (cleanValue.length > 7) {
-      formatted = `${formatted}-${cleanValue.substring(7)}`;
-    }
-    return formatted;
-  };
-
   const handleLoginCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCPF(e.target.value);
     setLoginCpf(formatted);
     if (loginCpfError) setLoginCpfError('');
   };
 
-  const handleLoginPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhone(e.target.value);
-    setLoginPhone(formatted);
-    if (loginPhoneError) setLoginPhoneError('');
+  const handleLoginEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLoginEmail(e.target.value.trim().toLowerCase());
+    if (loginEmailError) setLoginEmailError('');
   };
 
   const handleLoginCpfSubmit = async () => {
@@ -110,7 +94,7 @@ export function LoginModal() {
 
       if (data.exists) {
         setLoginUser(data.client);
-        setIsLoginStepPhone(true);
+        setIsLoginStepEmail(true);
         setLoginCpfError('');
       } else {
         setLoginCpfError('Usuário não encontrado. Faça seu primeiro pedido para criar uma conta.');
@@ -123,26 +107,53 @@ export function LoginModal() {
     }
   };
 
-  const handleLoginPhoneSubmit = () => {
-    const cleanPhone = loginPhone.replace(/\D/g, '');
-    const userCleanPhone = loginUser.phone?.replace(/\D/g, '') || '';
+  const handleLoginEmailSubmit = async () => {
+    const currentEmail = loginEmail.trim().toLowerCase();
+    if (!currentEmail || !currentEmail.includes('@')) {
+      setLoginEmailError('Email inválido.');
+      return;
+    }
 
-    if (cleanPhone === userCleanPhone) {
-      const userData = {
-        name: loginUser.name,
-        email: loginUser.email,
-        phone: loginUser.phone,
-        cpf: loginUser.cpf,
-      };
-      setUser(userData);
-      saveSession(userData);
-      setIsLoginModalOpen(false);
-      setLoginPhoneError('');
-      // Redireciona com o CPF na URL para carregar os bilhetes direto
-      const cleanCpf = loginUser.cpf?.replace(/\D/g, '') || '';
-      router.push(`/${tenant?.slug}/meus-bilhetes?cpf=${cleanCpf}`);
+    if (loginUser?.cpf) {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/client/session/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tenantSlug: tenant?.slug,
+            cpf: loginUser.cpf,
+            email: currentEmail,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+          setLoginEmailError(data?.error || 'Falha ao autenticar sessão.');
+          return;
+        }
+
+        const userData = {
+          name: data.client.name,
+          email: data.client.email,
+          phone: data.client.phone,
+          cpf: data.client.cpf,
+        };
+        setUser(userData);
+        saveSession(userData);
+        setIsLoginModalOpen(false);
+        setLoginEmailError('');
+        router.push(`/${tenant?.slug}/meus-bilhetes`);
+      } catch (error) {
+        console.error('Erro ao autenticar sessão do cliente:', error);
+        setLoginEmailError('Erro ao autenticar sessão. Tente novamente.');
+      } finally {
+        setLoading(false);
+      }
     } else {
-      setLoginPhoneError('Telefone incorreto.');
+      setLoginEmailError('Sessão de login inválida. Recomece o login.');
     }
   };
 
@@ -166,7 +177,7 @@ export function LoginModal() {
             <div className="p-8 space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-black font-display tracking-tight">
-                  {isLoginStepPhone ? `Olá, ${loginUser.name.split(' ')[0]}!` : 'Buscar Bilhetes'}
+                  {isLoginStepEmail ? `Ola, ${loginUser.name.split(' ')[0]}!` : 'Buscar Bilhetes'}
                 </h2>
                 <button
                   onClick={() => setIsLoginModalOpen(false)}
@@ -176,7 +187,7 @@ export function LoginModal() {
                 </button>
               </div>
 
-              {!isLoginStepPhone ? (
+              {!isLoginStepEmail ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Digite seu CPF</label>
@@ -200,31 +211,30 @@ export function LoginModal() {
               ) : (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Confirme seu Telefone</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Confirme seu Email</label>
                     <div className="relative">
                       <input
-                        type="text"
-                        value={loginPhone}
-                        onChange={handleLoginPhoneChange}
-                        placeholder="(00) 00000-0000"
-                        maxLength={15}
-                        className={`w-full bg-white/5 border ${loginPhoneError ? 'border-red-500' : 'border-white/10'} rounded-2xl px-4 py-3 pl-12 outline-none focus:border-emerald-500 transition-colors font-mono`}
+                        type="email"
+                        value={loginEmail}
+                        onChange={handleLoginEmailChange}
+                        placeholder="seu@email.com"
+                        className={`w-full bg-white/5 border ${loginEmailError ? 'border-red-500' : 'border-white/10'} rounded-2xl px-4 py-3 pl-12 outline-none focus:border-emerald-500 transition-colors`}
                       />
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                     </div>
-                    {loginPhoneError && <p className="text-xs text-red-500 font-bold">{loginPhoneError}</p>}
+                    {loginEmailError && <p className="text-xs text-red-500 font-bold">{loginEmailError}</p>}
                   </div>
                   <button
-                    onClick={handleLoginPhoneSubmit}
+                    onClick={handleLoginEmailSubmit}
                     className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black py-4 rounded-2xl uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
                     Ver Meus Bilhetes <ChevronRight size={16} />
                   </button>
                   <button
                     onClick={() => {
-                      setIsLoginStepPhone(false);
-                      setLoginPhone('');
-                      setLoginPhoneError('');
+                      setIsLoginStepEmail(false);
+                      setLoginEmail('');
+                      setLoginEmailError('');
                     }}
                     className="w-full text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest py-2"
                   >

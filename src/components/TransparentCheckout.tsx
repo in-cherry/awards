@@ -48,7 +48,7 @@ export function TransparentCheckout({ paymentData, onPaymentComplete, onClose }:
           onPaymentComplete?.();
           const session = getSession();
           if (session?.cpf) {
-            router.push(`/${tenant?.slug}/meus-bilhetes?cpf=${session.cpf.replace(/\D/g, '')}`);
+            router.push(`/${tenant?.slug}/meus-bilhetes`);
           } else {
             setIsLoginModalOpen(true);
           }

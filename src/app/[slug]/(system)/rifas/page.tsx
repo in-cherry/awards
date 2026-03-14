@@ -25,6 +25,13 @@ export default async function RifasPage({ params }: PageProps) {
         }
       },
       raffles: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          bannerUrl: true,
+          price: true,
+        },
         where: { status: 'ACTIVE' },
         orderBy: { createdAt: 'desc' }
       }
@@ -40,6 +47,9 @@ export default async function RifasPage({ params }: PageProps) {
     name: tenant.name,
     slug: tenant.slug,
     logoUrl: tenant.logoUrl,
+    instagramUrl: tenant.instagramUrl,
+    telegramUrl: tenant.telegramUrl,
+    supportUrl: tenant.supportUrl,
     isActive: tenant.isActive,
     owner: {
       name: tenant.owner?.name || '',
@@ -49,12 +59,12 @@ export default async function RifasPage({ params }: PageProps) {
 
   return (
     <AppContextProvider tenant={tenantData}>
-      <div className="min-h-screen flex flex-col bg-[#050505]">
+      <div className="min-h-screen flex flex-col text-white">
         <Header />
 
-        <main className="flex-grow pt-24 pb-20 px-4 md:px-0 max-w-lg mx-auto w-full">
+        <main className="flex-grow pt-14 pb-20 px-4 md:px-0 max-w-2xl mx-auto w-full">
           <div className="mb-8 text-center space-y-4">
-            <h1 className="text-3xl font-black text-white italic tracking-tight uppercase">
+            <h1 className="text-3xl font-black tracking-tight uppercase">
               Rifas <span className="text-emerald-500">Ativas</span>
             </h1>
             <p className="text-gray-400 font-medium">
@@ -73,10 +83,10 @@ export default async function RifasPage({ params }: PageProps) {
               tenant.raffles.map((raffle) => (
                 <Link
                   key={raffle.id}
-                  href={`/${slug}/${raffle.id}`}
+                  href={`/${slug}/rifa/${raffle.slug}`}
                   className="block group"
                 >
-                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-colors">
+                  <div className="bg-zinc-900/40 backdrop-blur-md border border-zinc-800 rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-colors">
                     <div className="aspect-[21/9] relative bg-neutral-900">
                       {raffle.bannerUrl ? (
                         <Image
@@ -111,7 +121,7 @@ export default async function RifasPage({ params }: PageProps) {
           </div>
         </main>
 
-        <Footer />
+        <Footer instagramUrl={tenant.instagramUrl} telegramUrl={tenant.telegramUrl} supportUrl={tenant.supportUrl} />
       </div>
     </AppContextProvider>
   );

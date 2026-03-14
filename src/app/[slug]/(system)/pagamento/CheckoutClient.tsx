@@ -6,9 +6,13 @@ import { Minus, Plus, Gift, User, Phone, Mail, CreditCard, Loader2 } from 'lucid
 import { useRouter } from 'next/navigation';
 import { MysteryBoxConfig } from '@/lib/types';
 import { getBoxesForTickets, getNextBoxIncentive } from '@/lib/mystery-box';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
+import { useApp } from '@/contexts/AppContext';
 
 interface RaffleData {
   id: string;
+  slug?: string;
   title: string;
   price: number;
   minNumbers: number;
@@ -39,6 +43,7 @@ function formatPhone(value: string): string {
 
 export function CheckoutClient({ slug, raffle }: CheckoutClientProps) {
   const router = useRouter();
+  const { tenant } = useApp();
 
   const [ticketCount, setTicketCount] = useState(raffle.minNumbers);
   const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '' });
@@ -92,7 +97,7 @@ export function CheckoutClient({ slug, raffle }: CheckoutClientProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug,
-          raffleId: raffle.id,
+          raffleRef: raffle.slug ?? raffle.id,
           ticketCount,
           client: {
             name: form.name.trim(),
@@ -109,7 +114,7 @@ export function CheckoutClient({ slug, raffle }: CheckoutClientProps) {
         return;
       }
 
-      router.push(`/${slug}/payment?id=${data.paymentId}&cpf=${form.cpf.replace(/\D/g, '')}`);
+      router.push(`/${slug}/meus-bilhetes`);
     } catch {
       setApiError('Erro de conexão. Tente novamente.');
     } finally {
@@ -118,12 +123,8 @@ export function CheckoutClient({ slug, raffle }: CheckoutClientProps) {
   }
 
   return (
-    <div className="min-h-screen font-sans selection:bg-emerald-500/30 bg-[#0f172a] text-white overflow-x-hidden">
-      <header className="py-6 px-4 border-b border-white/5">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-sm font-black tracking-[0.2em] text-emerald-400 uppercase">Winzy</h1>
-        </div>
-      </header>
+    <div className="min-h-screen font-sans selection:bg-emerald-500/30 text-white overflow-x-hidden">
+      <Header />
 
       <main className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <motion.div
@@ -161,8 +162,8 @@ export function CheckoutClient({ slug, raffle }: CheckoutClientProps) {
                       setForm((prev) => ({ ...prev, [key]: transform(e.target.value) }))
                     }
                     className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm font-medium outline-none transition-all text-white placeholder:text-gray-600 ${errors[key as keyof typeof errors]
-                        ? 'border-red-500/50 focus:border-red-400'
-                        : 'border-white/10 focus:border-emerald-500/50'
+                      ? 'border-red-500/50 focus:border-red-400'
+                      : 'border-white/10 focus:border-emerald-500/50'
                       }`}
                   />
                   {errors[key as keyof typeof errors] && (
@@ -285,6 +286,14 @@ export function CheckoutClient({ slug, raffle }: CheckoutClientProps) {
           </div>
         </motion.div>
       </main>
+
+      <div className="max-w-2xl mx-auto px-4 pb-8">
+        <Footer
+          instagramUrl={tenant?.instagramUrl}
+          telegramUrl={tenant?.telegramUrl}
+          supportUrl={tenant?.supportUrl}
+        />
+      </div>
     </div>
   );
 }

@@ -57,6 +57,9 @@ export default async function Tenant({ params }: PageProps) {
     name: tenant.name,
     slug: tenant.slug,
     logoUrl: tenant.logoUrl,
+    instagramUrl: tenant.instagramUrl,
+    telegramUrl: tenant.telegramUrl,
+    supportUrl: tenant.supportUrl,
     isActive: tenant.isActive,
     owner: {
       name: tenant.owner.name,

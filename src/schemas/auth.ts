@@ -43,9 +43,7 @@ export const newUserSchema = z.object({
   path: ["confirmPhone"], // Aponta o erro especificamente para este campo
 });
 
-// Schema 3: Confirmação de Telefone no Login
-export const loginPhoneSchema = z.object({
-  phone: z.string()
-    .transform(v => v.replace(/\D/g, ''))
-    .pipe(z.string().min(10, "Telefone inválido."))
+// Schema 3: Confirmacao de Email no Login
+export const loginEmailSchema = z.object({
+  email: z.string().email('Por favor, informe um e-mail valido.'),
 });

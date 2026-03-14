@@ -8,6 +8,9 @@ type Tenant = {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  instagramUrl?: string | null;
+  telegramUrl?: string | null;
+  supportUrl?: string | null;
   isActive: boolean;
   owner?: {
     name: string;
@@ -17,6 +20,7 @@ type Tenant = {
 
 type Raffle = {
   id: string;
+  slug?: string;
   title: string;
   description?: string | null;
   bannerUrl?: string | null;
@@ -90,19 +94,16 @@ interface AppContextType {
   setLoginCpf: React.Dispatch<React.SetStateAction<string>>;
   loginCpfError: string;
   setLoginCpfError: React.Dispatch<React.SetStateAction<string>>;
-  loginPhone: string;
-  setLoginPhone: React.Dispatch<React.SetStateAction<string>>;
-  loginPhoneError: string;
-  setLoginPhoneError: React.Dispatch<React.SetStateAction<string>>;
+  loginEmail: string;
+  setLoginEmail: React.Dispatch<React.SetStateAction<string>>;
+  loginEmailError: string;
+  setLoginEmailError: React.Dispatch<React.SetStateAction<string>>;
   loginUser: any;
   setLoginUser: React.Dispatch<React.SetStateAction<any>>;
-  isLoginStepPhone: boolean;
-  setIsLoginStepPhone: React.Dispatch<React.SetStateAction<boolean>>;
+  isLoginStepEmail: boolean;
+  setIsLoginStepEmail: React.Dispatch<React.SetStateAction<boolean>>;
   phoneError: string;
   setPhoneError: React.Dispatch<React.SetStateAction<string>>;
-  // Phone confirmation modal (compra com sessão ativa)
-  isPhoneConfirmModalOpen: boolean;
-  setIsPhoneConfirmModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   // Persistência de sessão
   saveUserSession: (user: { id?: string; name: string; email: string; phone?: string; cpf?: string; role?: 'USER' | 'ADMIN' }) => void;
   // Checkout states
@@ -149,12 +150,11 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
   const [cpfError, setCpfError] = useState('');
   const [loginCpf, setLoginCpf] = useState('');
   const [loginCpfError, setLoginCpfError] = useState('');
-  const [loginPhone, setLoginPhone] = useState('');
-  const [loginPhoneError, setLoginPhoneError] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginEmailError, setLoginEmailError] = useState('');
   const [loginUser, setLoginUser] = useState<any>(null);
-  const [isLoginStepPhone, setIsLoginStepPhone] = useState(false);
+  const [isLoginStepEmail, setIsLoginStepEmail] = useState(false);
   const [phoneError, setPhoneError] = useState('');
-  const [isPhoneConfirmModalOpen, setIsPhoneConfirmModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
   // Carrega sessão do localStorage na montagem
@@ -196,12 +196,11 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
       cpfError, setCpfError,
       loginCpf, setLoginCpf,
       loginCpfError, setLoginCpfError,
-      loginPhone, setLoginPhone,
-      loginPhoneError, setLoginPhoneError,
+      loginEmail, setLoginEmail,
+      loginEmailError, setLoginEmailError,
       loginUser, setLoginUser,
-      isLoginStepPhone, setIsLoginStepPhone,
+      isLoginStepEmail, setIsLoginStepEmail,
       phoneError, setPhoneError,
-      isPhoneConfirmModalOpen, setIsPhoneConfirmModalOpen,
       saveUserSession,
       isCheckoutModalOpen, setIsCheckoutModalOpen,
       checkoutPaymentData, setCheckoutPaymentData,

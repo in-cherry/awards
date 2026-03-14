@@ -115,13 +115,14 @@ export function PurchaseModal() {
       const data = await response.json();
 
       if (data.exists) {
-        setIsNewUser(false);
-        setUser({
-          name: data.client.name,
-          email: data.client.email,
-          phone: data.client.phone,
-          cpf: data.client.cpf
-        });
+        setIsNewUser(true);
+        setFormData(prev => ({
+          ...prev,
+          name: data.client?.name ?? prev.name,
+          email: '',
+          phone: '',
+          confirmPhone: '',
+        }));
       } else {
         setIsNewUser(true);
       }

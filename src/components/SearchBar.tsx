@@ -18,25 +18,25 @@ export function SearchBar() {
     setIsLoginModalOpen,
     setLoginCpf,
     setLoginCpfError,
-    setLoginPhone,
-    setLoginPhoneError,
-    setIsLoginStepPhone,
+    setLoginEmail,
+    setLoginEmailError,
+    setIsLoginStepEmail,
     setLoginUser
   } = useApp();
   const router = useRouter();
 
   const handleOpenLogin = () => {
-    // Se o usuário já tem sessão válida, redireciona direto para os bilhetes
+    // Sessao de cliente agora e validada no servidor via cookie httpOnly.
     if (user?.cpf) {
-      router.push(`/${tenant?.slug}/meus-bilhetes?cpf=${user.cpf.replace(/\D/g, '')}`);
+      router.push(`/${tenant?.slug}/meus-bilhetes`);
       return;
     }
     setIsLoginModalOpen(true);
     setLoginCpf('');
     setLoginCpfError('');
-    setLoginPhone('');
-    setLoginPhoneError('');
-    setIsLoginStepPhone(false);
+    setLoginEmail('');
+    setLoginEmailError('');
+    setIsLoginStepEmail(false);
     setLoginUser(null);
   };
 

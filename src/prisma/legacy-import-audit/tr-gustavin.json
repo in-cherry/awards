@@ -1,0 +1,143 @@
+{
+  "sourceFile": "c:\\Users\\Bunny\\Downloads\\trgustav_app.sql",
+  "importedAt": "2026-03-14T00:58:02.712Z",
+  "tenant": {
+    "id": "cmmpm8ack0001lkhk3r1l06uj",
+    "slug": "tr-gustavin",
+    "name": "Tr Gustavin"
+  },
+  "importedCounts": {
+    "users": 2,
+    "clients": 411,
+    "raffles": 1,
+    "payments": 5,
+    "numbers": 45468
+  },
+  "legacyOnlyData": {
+    "config": [
+      {
+        "id": "1",
+        "name": "Tr Gustavin",
+        "description": "Acompanhe minhas Redes Sociais! @tr.gustavin",
+        "domain": "https://www.trgustavin.com.br",
+        "path": "/play",
+        "token": "APP_USR-3227060006938302-040318-06ad58163a2d2a37af3ed76a8be937e4-255345220",
+        "logo": "https://www.trgustavin.com.br/play/views/theme/trgustavin/assets/img/logo.png",
+        "footer": "Tr Gustavin © 2024 - Todos os direitos reservados.",
+        "instagram_link": "https://instagram.com/tr.gustavin",
+        "whatsapp_link": "https://wa.link/6eaual",
+        "youtube_link": "https://www.youtube.com/@tr.gustavin",
+        "maintenance": "false"
+      }
+    ],
+    "numberwin": [
+      {
+        "id": "1",
+        "client": null,
+        "ticket": "1",
+        "number": "121212",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2024-11-09 19:11:36"
+      },
+      {
+        "id": "2",
+        "client": null,
+        "ticket": "1",
+        "number": "583438",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2025-03-08 22:07:39"
+      },
+      {
+        "id": "3",
+        "client": null,
+        "ticket": "1",
+        "number": "103546",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2024-11-09 19:11:39"
+      },
+      {
+        "id": "4",
+        "client": null,
+        "ticket": "1",
+        "number": "294560",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2024-11-09 19:11:41"
+      },
+      {
+        "id": "5",
+        "client": null,
+        "ticket": "1",
+        "number": "671332",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2024-11-09 19:11:43"
+      },
+      {
+        "id": "6",
+        "client": null,
+        "ticket": "1",
+        "number": "212121",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2025-03-08 20:01:12"
+      },
+      {
+        "id": "7",
+        "client": null,
+        "ticket": "1",
+        "number": "343434",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2025-03-08 20:01:15"
+      },
+      {
+        "id": "8",
+        "client": null,
+        "ticket": "1",
+        "number": "456789",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2025-03-08 20:01:17"
+      },
+      {
+        "id": "9",
+        "client": null,
+        "ticket": "1",
+        "number": "919293",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2025-03-08 20:01:19"
+      },
+      {
+        "id": "10",
+        "client": null,
+        "ticket": "1",
+        "number": "620422",
+        "award": "R$ 500,00 no Pix",
+        "status": "1",
+        "created_at": "2025-03-08 20:01:21"
+      }
+    ],
+    "promocode": [
+      {
+        "id": "1",
+        "ticket": "1",
+        "cupom": "GUSTAVIN10",
+        "descount": "0.10",
+        "descountPromo": "true",
+        "qntdOne": "50",
+        "descountOne": "0",
+        "qntdTwo": "150",
+        "descountTwo": "0",
+        "qntdTree": "300",
+        "descountTree": "0",
+        "qntdFour": "500",
+        "descountFour": "0"
+      }
+    ]
+  }
+}

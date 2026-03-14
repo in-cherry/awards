@@ -1,8 +1,6 @@
 import prisma from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import React from 'react';
-import { AppContextProvider } from '@/contexts/AppContext';
-import TenantPage from '../TenantPage';
 
 interface PageProps {
   params: Promise<{ slug: string; raffleId: string }>;
@@ -11,70 +9,18 @@ interface PageProps {
 export default async function RaffleByIdPage({ params }: PageProps) {
   const { slug, raffleId } = await params;
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug },
-    include: {
-      owner: {
-        select: {
-          name: true,
-          avatarUrl: true
-        }
-      },
-      raffles: {
-        where: { id: raffleId, status: 'ACTIVE' },
-        include: {
-          mysteryPrizes: {
-            include: {
-              winners: {
-                include: {
-                  client: { select: { name: true } }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+  const raffle = await prisma.raffle.findFirst({
+    where: {
+      id: raffleId,
+      tenant: { slug },
+      status: 'ACTIVE',
+    },
+    select: { slug: true },
   });
 
-  if (!tenant || tenant.raffles.length === 0) {
+  if (!raffle) {
     notFound();
   }
 
-  const activeRaffle = tenant.raffles[0];
-
-  const tenantData = {
-    id: tenant.id,
-    name: tenant.name,
-    slug: tenant.slug,
-    logoUrl: tenant.logoUrl,
-    isActive: tenant.isActive,
-    owner: {
-      name: tenant.owner?.name || '',
-      avatarUrl: tenant.owner?.avatarUrl || null,
-    }
-  };
-
-  const raffleData = {
-    id: activeRaffle.id,
-    title: activeRaffle.title,
-    description: activeRaffle.description,
-    bannerUrl: activeRaffle.bannerUrl,
-    price: Number(activeRaffle.price),
-    minNumbers: activeRaffle.minNumbers,
-    totalNumbers: activeRaffle.totalNumbers,
-    status: activeRaffle.status,
-    drawDate: activeRaffle.drawDate,
-    nextTicketNumber: activeRaffle.nextTicketNumber,
-    mysteryBoxEnabled: activeRaffle.mysteryBoxEnabled,
-    mysteryBoxConfig: activeRaffle.mysteryBoxConfig,
-    winnerId: activeRaffle.winnerId,
-    mysteryPrizes: activeRaffle.mysteryPrizes || []
-  };
-
-  return (
-    <AppContextProvider tenant={tenantData} raffle={raffleData}>
-      <TenantPage />
-    </AppContextProvider>
-  );
+  redirect(`/${slug}/rifa/${raffle.slug}`);
 }

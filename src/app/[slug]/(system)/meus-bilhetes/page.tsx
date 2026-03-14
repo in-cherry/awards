@@ -3,15 +3,25 @@ import { notFound } from 'next/navigation';
 import { MyTicketsClient } from './MyTicketsClient';
 import { SlugSearchPageProps } from '@/lib/types';
 import { AppContextProvider } from '@/contexts/AppContext';
+import { readOpenedMysteryBoxes } from '@/core/mystery-box/opened-box-state';
+import { cookies } from 'next/headers';
+import { clientSessionCookieName, verifyClientSessionToken } from '@/core/auth/client-session';
 
 export default async function MyTicketsPage({ params, searchParams }: SlugSearchPageProps) {
   const { slug } = await params;
-  const { cpf } = await searchParams;
+  await searchParams;
 
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) notFound();
 
-  const clientCpf = typeof cpf === 'string' ? cpf.replace(/\D/g, '') : null;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(clientSessionCookieName)?.value;
+  const clientSession = token ? await verifyClientSessionToken(token) : null;
+
+  const sessionMatchesTenant =
+    clientSession && clientSession.tenantId === tenant.id && clientSession.tenantSlug === tenant.slug;
+
+  const clientCpf = sessionMatchesTenant ? clientSession.cpf : null;
 
   const tenantData = {
     id: tenant.id,
@@ -51,10 +61,11 @@ export default async function MyTicketsPage({ params, searchParams }: SlugSearch
       boxesGranted: true,
       createdAt: true,
       raffle: {
-        select: { id: true, title: true, mysteryBoxEnabled: true },
+        select: { id: true, slug: true, title: true, mysteryBoxEnabled: true },
       },
+      metadata: true,
       tickets: {
-        select: { number: true },
+        select: { numberFormatted: true },
         orderBy: { number: 'asc' },
       },
       mysteryWon: {
@@ -67,21 +78,35 @@ export default async function MyTicketsPage({ params, searchParams }: SlugSearch
     },
   });
 
-  const data = payments.map((p: any) => ({
-    id: p.id,
-    amount: Number(p.amount),
-    ticketCount: p.ticketCount,
-    boxesGranted: p.boxesGranted,
-    createdAt: p.createdAt.toISOString(),
-    raffle: p.raffle,
-    tickets: p.tickets.map((t: any) => t.number),
-    openedBoxes: p.mysteryWon.map((w: any) => ({
-      id: w.id,
-      boxIndex: w.boxIndex,
-      prizeId: w.prize.id,
-      prizeName: w.prize.title,
-    })),
-  }));
+  const data = payments.map((p: any) => {
+    const openedWithoutPrize = readOpenedMysteryBoxes(p.metadata)
+      .filter((entry) => !entry.won)
+      .map((entry) => ({
+        id: `no-prize-${entry.boxIndex}`,
+        boxIndex: entry.boxIndex,
+        prizeId: '',
+        prizeName: '',
+      }));
+
+    return {
+      id: p.id,
+      amount: Number(p.amount),
+      ticketCount: p.ticketCount,
+      boxesGranted: p.boxesGranted,
+      createdAt: p.createdAt.toISOString(),
+      raffle: p.raffle,
+      tickets: p.tickets.map((t: any) => t.numberFormatted),
+      openedBoxes: [
+        ...p.mysteryWon.map((w: any) => ({
+          id: w.id,
+          boxIndex: w.boxIndex,
+          prizeId: w.prize.id,
+          prizeName: w.prize.title,
+        })),
+        ...openedWithoutPrize,
+      ].sort((a: any, b: any) => a.boxIndex - b.boxIndex),
+    };
+  });
 
   return (
     <AppContextProvider tenant={tenantData}>

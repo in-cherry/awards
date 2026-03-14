@@ -1,7 +1,20 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
-import { attemptMysteryBoxWin, parseMysteryBoxConfig } from '@/lib/mystery-box';
+import { randomInt } from 'crypto';
+import {
+  appendOpenedMysteryBoxToMetadata,
+  readOpenedMysteryBoxes,
+} from '@/core/mystery-box/opened-box-state';
+
+const MYSTERY_BOX_WIN_PROBABILITY = 0.1;
+const RANDOM_SCALE = 1_000_000;
+
+function attemptMysteryBoxWinAtTenPercent(): boolean {
+  const threshold = Math.floor(MYSTERY_BOX_WIN_PROBABILITY * RANDOM_SCALE);
+  const draw = randomInt(0, RANDOM_SCALE);
+  return draw < threshold;
+}
 
 const schema = z.object({
   paymentId: z.string().min(1),
@@ -35,13 +48,24 @@ export async function POST(req: Request) {
           },
         },
         mysteryWon: {
-          select: { boxIndex: true },
+          select: {
+            id: true,
+            boxIndex: true,
+            prizeId: true,
+            prize: {
+              select: {
+                title: true,
+                description: true,
+              },
+            },
+          },
         },
         tickets: {
           select: { number: true },
           take: 1,
           orderBy: { number: 'asc' },
         },
+        metadata: true,
       },
     });
 
@@ -53,36 +77,79 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Mystery Box não habilitada nesta rifa' }, { status: 400 });
     }
 
-    const config = parseMysteryBoxConfig(payment.raffle.mysteryBoxConfig);
-    if (!config) {
-      return NextResponse.json({ error: 'Configuração de mystery box inválida' }, { status: 500 });
-    }
-
     // 2. Validar que o boxIndex é válido e ainda não foi aberto
     if (boxIndex >= payment.boxesGranted) {
       return NextResponse.json({ error: 'Caixa inválida' }, { status: 400 });
     }
 
-    const alreadyOpened = payment.mysteryWon.some((w: any) => w.boxIndex === boxIndex);
-    if (alreadyOpened) {
-      return NextResponse.json({ error: 'Esta caixa já foi aberta' }, { status: 400 });
+    const openedFromMetadata = readOpenedMysteryBoxes(payment.metadata);
+    const openedFromWinners = payment.mysteryWon.map((winner: any) => ({
+      boxIndex: winner.boxIndex,
+      won: true,
+      prizeId: winner.prizeId,
+      openedAt: new Date().toISOString(),
+    }));
+    const mergedOpenedByBox = new Map<number, { boxIndex: number; won: boolean; prizeId?: string; openedAt: string }>();
+    for (const opened of [...openedFromMetadata, ...openedFromWinners]) {
+      mergedOpenedByBox.set(opened.boxIndex, opened);
     }
+    const mergedOpened = Array.from(mergedOpenedByBox.values());
 
-    // 3. Decidir se ganhou (probabilidade real e justa)
-    const won = attemptMysteryBoxWin(config.winProbability);
+    const alreadyOpened = mergedOpened.some((opened) => opened.boxIndex === boxIndex);
+    if (alreadyOpened) {
+      const openedWinner = payment.mysteryWon.find((winner: any) => winner.boxIndex === boxIndex);
+      if (openedWinner) {
+        return NextResponse.json({
+          won: true,
+          prize: {
+            id: openedWinner.prizeId,
+            name: openedWinner.prize.title,
+            description: openedWinner.prize.description,
+          },
+          winnerId: openedWinner.id,
+          boxesOpened: mergedOpened.length,
+          boxesTotal: payment.boxesGranted,
+        });
+      }
 
-    if (!won) {
-      // Sem prêmio — registrar box como aberta sem prêmio usando um "prize vazio"
-      // Para manter rastreabilidade, criamos um registro em MysteryPrizeWinner sem prêmio
-      // Porém nosso modelo requer um prizeId. Usamos uma abordagem alternativa:
-      // Não criar registro — apenas retornar que não ganhou.
-      // O frontend rastreia pelo boxIndex da lista que voltou do servidor.
-      // Para persistência, usaríamos uma tabela separada de "caixas abertas".
-      // Por ora, o frontend adiciona uma entrada local com prizeName=''.
       return NextResponse.json({
         won: false,
-        boxesOpened: payment.mysteryWon.length + 1,
+        boxesOpened: mergedOpened.length,
         boxesTotal: payment.boxesGranted,
+        openedBox: {
+          id: `no-prize-${boxIndex}`,
+          boxIndex,
+          prizeId: '',
+          prizeName: '',
+        },
+      });
+    }
+
+    // 3. Decidir se ganhou com probabilidade real fixa de 10%
+    const won = attemptMysteryBoxWinAtTenPercent();
+
+    if (!won) {
+      const updatedMetadata = appendOpenedMysteryBoxToMetadata(payment.metadata, {
+        boxIndex,
+        won: false,
+        openedAt: new Date().toISOString(),
+      });
+
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { metadata: updatedMetadata },
+      });
+
+      return NextResponse.json({
+        won: false,
+        boxesOpened: mergedOpened.length + 1,
+        boxesTotal: payment.boxesGranted,
+        openedBox: {
+          id: `no-prize-${boxIndex}`,
+          boxIndex,
+          prizeId: '',
+          prizeName: '',
+        },
       });
     }
 
@@ -96,11 +163,27 @@ export async function POST(req: Request) {
     });
 
     if (!availablePrize) {
-      // Ganhou mas não há prêmios disponíveis
+      const updatedMetadata = appendOpenedMysteryBoxToMetadata(payment.metadata, {
+        boxIndex,
+        won: false,
+        openedAt: new Date().toISOString(),
+      });
+
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { metadata: updatedMetadata },
+      });
+
       return NextResponse.json({
         won: false,
-        boxesOpened: payment.mysteryWon.length + 1,
+        boxesOpened: mergedOpened.length + 1,
         boxesTotal: payment.boxesGranted,
+        openedBox: {
+          id: `no-prize-${boxIndex}`,
+          boxIndex,
+          prizeId: '',
+          prizeName: '',
+        },
       });
     }
 
@@ -116,7 +199,7 @@ export async function POST(req: Request) {
         data: { remaining: { decrement: 1 } },
       });
 
-      return tx.mysteryPrizeWinner.create({
+      const createdWinner = await tx.mysteryPrizeWinner.create({
         data: {
           prizeId: availablePrize.id,
           clientId: payment.clientId,
@@ -126,6 +209,20 @@ export async function POST(req: Request) {
         },
         select: { id: true },
       });
+
+      const updatedMetadata = appendOpenedMysteryBoxToMetadata(payment.metadata, {
+        boxIndex,
+        won: true,
+        prizeId: availablePrize.id,
+        openedAt: new Date().toISOString(),
+      });
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { metadata: updatedMetadata },
+      });
+
+      return createdWinner;
     });
 
     return NextResponse.json({
@@ -136,8 +233,14 @@ export async function POST(req: Request) {
         description: availablePrize.description,
       },
       winnerId: winner.id,
-      boxesOpened: payment.mysteryWon.length + 1,
+      boxesOpened: mergedOpened.length + 1,
       boxesTotal: payment.boxesGranted,
+      openedBox: {
+        id: winner.id,
+        boxIndex,
+        prizeId: availablePrize.id,
+        prizeName: availablePrize.title,
+      },
     });
   } catch (error) {
     console.error('[Mystery Box] Erro:', error);
