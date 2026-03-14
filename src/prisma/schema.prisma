@@ -33,18 +33,18 @@ model Tenant {
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
 
-  name         String
-  slug         String  @unique
-  customDomain String? @unique
-  logoUrl      String?
-  faviconUrl   String?
-  metaTitle    String?
+  name            String
+  slug            String  @unique
+  customDomain    String? @unique
+  logoUrl         String?
+  faviconUrl      String?
+  metaTitle       String?
   metaDescription String?
-  instagramUrl String?
-  telegramUrl  String?
-  supportUrl   String?
-  isActive     Boolean @default(true)
-  homeView     String  @default("RAFFLE") // RAFFLE (mostra rifa principal) ou LIST (mostra lista de rifas)
+  instagramUrl    String?
+  telegramUrl     String?
+  supportUrl      String?
+  isActive        Boolean @default(true)
+  homeView        String  @default("RAFFLE") // RAFFLE (mostra rifa principal) ou LIST (mostra lista de rifas)
 
   // Mercado Pago — split de pagamentos (OAuth do tenant)
   mpAccessToken String? // Access token MP do tenant (OAuth)
