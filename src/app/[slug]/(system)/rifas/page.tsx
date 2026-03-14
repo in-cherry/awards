@@ -62,17 +62,18 @@ export default async function RifasPage({ params }: PageProps) {
       <div className="min-h-screen flex flex-col text-white">
         <Header />
 
-        <main className="flex-grow pt-14 pb-20 px-4 md:px-0 max-w-2xl mx-auto w-full">
-          <div className="mb-8 text-center space-y-4">
-            <h1 className="text-3xl font-black tracking-tight uppercase">
+        <main className="flex-grow pt-8 pb-20 px-4 max-w-2xl mx-auto w-full space-y-6">
+          <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl p-5 md:p-6">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-400 font-black">Catalogo de campanhas</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight uppercase">
               Rifas <span className="text-emerald-500">Ativas</span>
             </h1>
-            <p className="text-gray-400 font-medium">
-              Escolha uma rifa abaixo e participe!
+            <p className="mt-2 text-zinc-400 font-medium">
+              Mesmo fluxo visual da home: escolha a campanha e avance para participar.
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 rounded-3xl border border-white/10 bg-black/20 backdrop-blur-xl p-4 md:p-5">
             {tenant.raffles.length === 0 ? (
               <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
                 <Gift className="w-12 h-12 text-gray-500 mx-auto mb-4" />

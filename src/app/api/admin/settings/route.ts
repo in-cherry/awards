@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
       ownerName,
       avatarUrl,
       homeView,
+      metaTitle,
+      metaDescription,
       instagramUrl,
       telegramUrl,
       supportUrl,
@@ -35,6 +37,8 @@ export async function POST(req: NextRequest) {
       data: {
         logoUrl: logoUrl || null,
         faviconUrl: faviconUrl || null,
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
         instagramUrl: instagramUrl || null,
         telegramUrl: telegramUrl || null,
         supportUrl: supportUrl || null,

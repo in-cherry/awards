@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, LayoutDashboard } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Header } from '@/components/Header';
 import { SearchBar } from '@/components/SearchBar';
@@ -15,7 +15,6 @@ import { Footer } from '@/components/Footer';
 import { LoginModal } from '@/components/Modals/LoginModal';
 import { PurchaseModal } from '@/components/Modals/PurchaseModal';
 import { MysteryBoxModal } from '@/components/Modals/MysteryBoxModal';
-import Link from 'next/link';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -36,13 +35,7 @@ export default function TenantPage() {
   const { raffle, tenant } = useApp();
 
   return (
-    <div className="min-h-screen font-sans selection:bg-emerald-500/30 bg-[#0f172a] text-white overflow-x-hidden">
-      {/* Background blobs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000" />
-        <div className="absolute top-[40%] left-[30%] w-[30%] h-[30%] bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-4000" />
-      </div>
+    <div className="min-h-screen font-sans selection:bg-emerald-500/30 text-white overflow-x-hidden">
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -55,7 +48,7 @@ export default function TenantPage() {
         >
           <Header />
 
-          <main className="max-w-2xl mx-auto px-4 mt-8 space-y-8">
+          <main className="max-w-2xl mx-auto px-4 mt-8 space-y-6">
             {/* Raffle Status Banner */}
             {raffle?.status === 'FINISHED' && (
               <motion.div
@@ -68,13 +61,15 @@ export default function TenantPage() {
               </motion.div>
             )}
 
-            <SearchBar />
-            <RaffleInfo />
-            <MysteryBoxInfo />
-            <Ranking />
+            <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl p-4 md:p-6 space-y-6">
+              <SearchBar />
+              <RaffleInfo />
+              <MysteryBoxInfo />
+              <Ranking />
+              <TicketSelector />
+              <TrustBadges />
+            </div>
 
-            <TicketSelector />
-            <TrustBadges />
             <Footer
               instagramUrl={tenant?.instagramUrl}
               telegramUrl={tenant?.telegramUrl}

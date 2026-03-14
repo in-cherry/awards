@@ -26,6 +26,8 @@ interface AdminPanelProps {
     slug: string;
     logoUrl?: string;
     faviconUrl?: string;
+    metaTitle?: string;
+    metaDescription?: string;
     instagramUrl?: string;
     telegramUrl?: string;
     supportUrl?: string;
@@ -128,7 +130,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles, 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="min-h-screen bg-[#0f172a] flex items-center justify-center"
+        className="min-h-screen flex items-center justify-center"
       >
         <p className="text-white/70 text-sm uppercase tracking-widest font-black">Carregando sessao...</p>
       </motion.div>
@@ -139,7 +141,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ tenant, stats, raffles, 
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-[#0f172a]"
+      className="min-h-screen"
     >
       {!isAuthenticated ? (
         <AdminLogin

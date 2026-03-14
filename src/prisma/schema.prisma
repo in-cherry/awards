@@ -38,6 +38,8 @@ model Tenant {
   customDomain String? @unique
   logoUrl      String?
   faviconUrl   String?
+  metaTitle    String?
+  metaDescription String?
   instagramUrl String?
   telegramUrl  String?
   supportUrl   String?

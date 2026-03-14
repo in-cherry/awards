@@ -23,6 +23,8 @@ interface AdminDashboardProps {
     id: string; name: string; slug: string;
     logoUrl?: string;
     faviconUrl?: string;
+    metaTitle?: string;
+    metaDescription?: string;
     instagramUrl?: string;
     telegramUrl?: string;
     supportUrl?: string;
@@ -50,6 +52,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'raffles' | 'settings'>('overview');
   const [logoUrl, setLogoUrl] = useState(tenant.logoUrl || '');
   const [faviconUrl, setFaviconUrl] = useState(tenant.faviconUrl || '');
+  const [metaTitle, setMetaTitle] = useState(tenant.metaTitle || '');
+  const [metaDescription, setMetaDescription] = useState(tenant.metaDescription || '');
   const [instagramUrl, setInstagramUrl] = useState(tenant.instagramUrl || '');
   const [telegramUrl, setTelegramUrl] = useState(tenant.telegramUrl || '');
   const [supportUrl, setSupportUrl] = useState(tenant.supportUrl || '');
@@ -102,6 +106,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           tenantId: tenant.id,
           logoUrl,
           faviconUrl,
+          metaTitle,
+          metaDescription,
           instagramUrl,
           telegramUrl,
           supportUrl,
@@ -167,9 +173,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-900 to-black">
+    <div className="min-h-screen flex flex-col text-white">
       {/* Header */}
-      <header className="py-6 px-6 flex items-center justify-between border-b border-white/10 sticky top-0 bg-gray-900/90 backdrop-blur-md z-50">
+      <header className="py-6 px-6 flex items-center justify-between border-b border-white/10 sticky top-0 bg-black/35 backdrop-blur-xl z-50">
         <div className="flex items-center gap-3">
           {logoUrl && (
             <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500/30">
@@ -746,6 +752,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className="text-xs font-black uppercase tracking-widest hidden lg:block">Upload</span>
                             <span className="text-xs font-black uppercase tracking-widest lg:hidden">⬆</span>
                           </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 border-t border-white/10 pt-6">
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+                        Metadata (SEO)
+                      </label>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                            Meta Título
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={`Padrão: Winzy | ${tenant.name}`}
+                            value={metaTitle}
+                            onChange={(e) => setMetaTitle(e.target.value.slice(0, 70))}
+                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none transition-all"
+                          />
+                          <p className="mt-1 text-[10px] text-gray-500">Deixe vazio para usar o padrão da plataforma.</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                            Meta Descrição
+                          </label>
+                          <textarea
+                            placeholder="Descrição que aparece nos resultados de busca."
+                            value={metaDescription}
+                            onChange={(e) => setMetaDescription(e.target.value.slice(0, 170))}
+                            rows={3}
+                            className="w-full resize-none bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none transition-all"
+                          />
+                          <p className="mt-1 text-[10px] text-gray-500">Se vazio, a descrição padrão da Winzy será aplicada.</p>
                         </div>
                       </div>
                     </div>

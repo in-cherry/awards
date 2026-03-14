@@ -4,7 +4,6 @@ import React from 'react';
 import { Search } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useApp } from '@/contexts/AppContext';
-import { useRouter } from 'next/navigation';
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -13,8 +12,6 @@ const itemVariants = {
 
 export function SearchBar() {
   const {
-    user,
-    tenant,
     setIsLoginModalOpen,
     setLoginCpf,
     setLoginCpfError,
@@ -23,14 +20,9 @@ export function SearchBar() {
     setIsLoginStepEmail,
     setLoginUser
   } = useApp();
-  const router = useRouter();
 
   const handleOpenLogin = () => {
-    // Sessao de cliente agora e validada no servidor via cookie httpOnly.
-    if (user?.cpf) {
-      router.push(`/${tenant?.slug}/meus-bilhetes`);
-      return;
-    }
+    // Sempre abre modal para garantir autenticacao server-side consistente.
     setIsLoginModalOpen(true);
     setLoginCpf('');
     setLoginCpfError('');
