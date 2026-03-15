@@ -48,7 +48,7 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: #09090b;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -120,9 +120,16 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply font-sans antialiased;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, rgba(16, 185, 129, 0.12), transparent 45%),
+      radial-gradient(900px 500px at 8% 8%, rgba(14, 165, 233, 0.08), transparent 38%),
+      radial-gradient(900px 540px at 90% 0%, rgba(16, 185, 129, 0.08), transparent 40%),
+      var(--color-background);
   }
+
   html {
     @apply font-sans;
   }
