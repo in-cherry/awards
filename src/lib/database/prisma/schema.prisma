@@ -9,18 +9,23 @@ datasource db {
 // --- NÚCLEO DE USUÁRIOS ---
 
 model User {
-  id                  String         @id
-  email               String         @unique
+  id                  String             @id
+  email               String             @unique
   password            String
   name                String
   phone               String
-  cpf                 String         @unique
+  cpf                 String             @unique
+  isActive            Boolean            @default(true)
+  emailVerifiedAt     DateTime?
+  lastLoginAt         DateTime?
   profile             Profile?
-  ownedTenants        Tenant[]       @relation("OwnerTenants")
+  ownedTenants        Tenant[]           @relation("OwnerTenants")
   memberTenants       TenantMember[]
-  sentMemberInvites   TenantMember[] @relation("InviteRelation")
-  sentExternalInvites TenantInvite[] @relation("InviteRelation")
-  createdAt           DateTime       @default(now())
+  sentMemberInvites   TenantMember[]     @relation("InviteRelation")
+  sentExternalInvites TenantInvite[]     @relation("InviteRelation")
+  verificationCodes   VerificationCode[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@map("users")
 }
@@ -40,15 +45,19 @@ model Profile {
 // --- ESTRUTURA SAAS (TENANT) ---
 
 model Tenant {
-  id        String  @id @default(uuid())
-  owner     User    @relation("OwnerTenants", fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId   String
-  name      String
-  slug      String  @unique
-  logo      String?
-  favicon   String?
-  instagram String?
-  telegram  String?
+  id              String  @id @default(uuid())
+  owner           User    @relation("OwnerTenants", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId         String
+  name            String
+  slug            String  @unique
+  customDomain    String? @unique
+  metaTitle       String?
+  metaDescription String? @db.Text
+  logo            String?
+  favicon         String?
+  instagram       String?
+  telegram        String?
+  supportUrl      String?
 
   connections Connection[]
   members     TenantMember[]
@@ -60,6 +69,7 @@ model Tenant {
   payments    Payment[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("tenants")
 }
@@ -128,10 +138,13 @@ model Client {
   email    String
   phone    String
 
-  profile  ClientProfile?
-  payments Payment[]
-  tickets  Ticket[]
-  awards   Award[]
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  profile           ClientProfile?
+  verificationCodes VerificationCode[]
+  payments          Payment[]
+  tickets           Ticket[]
+  awards            Award[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,6 +152,26 @@ model Client {
   @@unique([tenantId, cpf])
   @@unique([tenantId, email])
   @@map("clients")
+}
+
+model VerificationCode {
+  id        String                  @id @default(cuid())
+  codeHash  String
+  purpose   VerificationCodePurpose
+  email     String
+  user      User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?
+  client    Client?                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId  String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime                @default(now())
+
+  @@index([email, purpose])
+  @@index([userId, purpose])
+  @@index([clientId, purpose])
+  @@index([expiresAt])
+  @@map("verification_codes")
 }
 
 model ClientProfile {
@@ -154,16 +187,19 @@ model ClientProfile {
 }
 
 model Raffle {
-  id          String  @id @default(uuid())
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String       @id @default(uuid())
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tenantId    String
   name        String
   slug        String
-  description String? @db.Text
+  description String?      @db.Text
   banner      String?
-  pixValue    Decimal @db.Decimal(10, 2)
-  priceTicket Decimal @db.Decimal(10, 2)
-  minTickets  Int     @default(1)
+  status      RaffleStatus @default(DRAFT)
+  drawDate    DateTime?
+  finishedAt  DateTime?
+  pixValue    Decimal      @db.Decimal(10, 2)
+  priceTicket Decimal      @db.Decimal(10, 2)
+  minTickets  Int          @default(1)
   maxTickets  Int
 
   awards  Award[]
@@ -278,5 +314,18 @@ enum PaymentStatus {
   PENDING
   COMPLETED
   FAILED
+  CANCELED
+}
+
+enum VerificationCodePurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  LOGIN
+}
+
+enum RaffleStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
   CANCELED
 }
