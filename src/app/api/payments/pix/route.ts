@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Decimal } from "@prisma/client/runtime/library";
 import prisma from "@/lib/database/prisma";
 
 type PaymentPayload = {
@@ -40,8 +39,8 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
   return { firstName, lastName };
 }
 
-function asCurrencyDecimal(value: number): Decimal {
-  return new Decimal(value.toFixed(2));
+function asCurrencyDecimal(value: number): string {
+  return value.toFixed(2);
 }
 
 function isFinitePositiveNumber(value: unknown): value is number {

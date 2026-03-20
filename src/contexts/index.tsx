@@ -159,15 +159,19 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
   useEffect(() => {
-    if (user || !tenantState?.slug) {
+    const tenantSlug = tenantState?.slug;
+
+    if (user || !tenantSlug) {
       return;
     }
+
+    const safeTenantSlug = tenantSlug;
 
     let isMounted = true;
 
     async function hydrateUserFromCookie() {
       try {
-        const response = await fetch(`/api/public/client/me?slug=${encodeURIComponent(tenantState.slug)}`, {
+        const response = await fetch(`/api/public/client/me?slug=${encodeURIComponent(safeTenantSlug)}`, {
           method: "GET",
           credentials: "include",
           cache: "no-store",

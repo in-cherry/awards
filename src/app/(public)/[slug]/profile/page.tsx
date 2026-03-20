@@ -24,4 +24,3 @@ export default async function ClientProfilePage(props: { params: Params }) {
 
   return <ClientProfileView slug={slug} />;
 }
-raffle: {

@@ -72,7 +72,7 @@ export function Raffle() {
   };
 
   const handleDecrease = () => {
-    setTicketCount(prev => Math.max(raffle.minNumbers, prev - 1));
+    setTicketCount((prev) => Math.max(raffle?.minNumbers ?? 1, prev - 1));
   };
 
   useEffect(() => {

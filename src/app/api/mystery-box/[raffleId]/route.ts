@@ -10,18 +10,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
       where: { id: raffleId },
       select: {
         id: true,
-        mysteryBoxEnabled: true,
-        mysteryPrizes: {
-          where: { remaining: { gt: 0 } },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            totalAmount: true,
-            remaining: true,
-          },
-          orderBy: { createdAt: "asc" },
-        },
       },
     });
 
@@ -29,7 +17,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
       return NextResponse.json({ error: "Raffle not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, raffle });
+    return NextResponse.json({
+      success: true,
+      raffle: {
+        id: raffle.id,
+        mysteryBoxEnabled: false,
+        mysteryPrizes: [],
+      },
+    });
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
