@@ -37,3 +37,21 @@ export const formatDate = (dateString: string): string => {
     year: 'numeric',
   });
 }
+
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat('pt-BR').format(value);
+}
+
+export function formatRaffleCreatedAt(dateInput: string | Date): string {
+  const date = new Date(dateInput);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Criada em data invalida';
+  }
+
+  return `Criada em ${date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })}`;
+}
