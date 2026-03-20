@@ -11,7 +11,7 @@ export function proxy(req: NextRequest) {
   const host = req.headers.get("host")?.split(":")[0] || "";
 
   const isDevelopment = process.env.NODE_ENV === "development";
-  const rootDomain = isDevelopment ? "localhost" : "seu-dominio-producao.com";
+  const rootDomain = isDevelopment ? "localhost" : (process.env.APP_ROOT_DOMAIN || "localhost");
 
   const reservedSubdomains = [
     "www", "api", "admin", "mail", "ftp", "dev", "staging", "test", "beta", "alpha", "demo",

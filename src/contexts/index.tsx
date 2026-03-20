@@ -129,7 +129,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppContextProvider({ children, tenant, raffle }: { children: ReactNode; tenant?: Tenant; raffle?: Raffle }) {
   const [tenantState, setTenant] = useState<Tenant | null>(tenant || null);
   const [raffleState, setRaffle] = useState<Raffle | null>(raffle || null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => getSession());
   const [isAdmin, setIsAdmin] = useState(false);
   const [ticketCount, setTicketCount] = useState(raffle?.minNumbers || 1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -158,13 +158,63 @@ export function AppContextProvider({ children, tenant, raffle }: { children: Rea
   const [phoneError, setPhoneError] = useState('');
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
-  // Carrega sessão do localStorage na montagem
   useEffect(() => {
-    const session = getSession();
-    if (session) {
-      setUser(session);
+    if (user || !tenantState?.slug) {
+      return;
     }
-  }, []);
+
+    let isMounted = true;
+
+    async function hydrateUserFromCookie() {
+      try {
+        const response = await fetch(`/api/public/client/me?slug=${encodeURIComponent(tenantState.slug)}`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as {
+          success?: boolean;
+          client?: {
+            id: string;
+            name: string;
+            email: string;
+            phone?: string;
+            cpf?: string;
+            nickname?: string | null;
+          };
+        };
+
+        if (!isMounted || !data.success || !data.client) {
+          return;
+        }
+
+        const hydratedUser: User = {
+          id: data.client.id,
+          name: data.client.nickname || data.client.name,
+          email: data.client.email,
+          phone: data.client.phone,
+          cpf: data.client.cpf,
+          role: "USER",
+        };
+
+        saveSession(hydratedUser);
+        setUser(hydratedUser);
+      } catch {
+        // Ignora falhas de hidratação para nao bloquear a interface.
+      }
+    }
+
+    void hydrateUserFromCookie();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantState?.slug, user]);
 
   const saveUserSession = (userData: Parameters<typeof saveSession>[0]) => {
     saveSession(userData);

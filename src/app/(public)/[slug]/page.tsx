@@ -1,10 +1,11 @@
 import { Footer } from "@/components/tenant/footer";
 import { Header } from "@/components/tenant/header";
+import { NoRaffle } from "@/components/tenant/no-raffle";
 import prisma from "@/lib/database/prisma";
-import { notFound } from "next/navigation";
-import { motion } from "motion/react";
+import { notFound, permanentRedirect } from "next/navigation";
 import { AppContextProvider } from "@/contexts";
 import { Raffle } from "@/components/tenant/raffle";
+import { headers } from "next/headers";
 
 interface TenantProps {
   params: Promise<{ slug: string }>
@@ -12,6 +13,9 @@ interface TenantProps {
 
 export default async function Tenant({ params }: TenantProps) {
   const { slug } = await params;
+  const headersList = await headers();
+  const hostHeader = headersList.get("host") ?? "";
+  const protocolHeader = headersList.get("x-forwarded-proto");
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
@@ -19,75 +23,108 @@ export default async function Tenant({ params }: TenantProps) {
       owner: {
         select: {
           name: true,
-          avatarUrl: true
+          profile: {
+            select: {
+              avatar: true,
+            },
+          },
         }
       },
       raffles: {
-        where: { status: 'ACTIVE' },
+        where: {
+          status: "ACTIVE",
+        },
         orderBy: { createdAt: 'desc' },
-        include: {
-          mysteryPrizes: {
-            include: {
-              winners: {
-                include: {
-                  client: { select: { name: true } }
-                }
-              }
-            }
-          }
-        }
+        take: 1,
       }
-    }
+    },
   });
 
   if (!tenant) {
     notFound();
   }
 
-  const activeRaffle = tenant.raffles[0] || null;
+  const currentHostWithoutPort = hostHeader.split(":")[0].toLowerCase();
+  const currentPort = hostHeader.includes(":") ? hostHeader.split(":")[1] : "";
 
+  const appHostname = (() => {
+    try {
+      if (!process.env.NEXT_PUBLIC_APP_URL) return null;
+      return new URL(process.env.NEXT_PUBLIC_APP_URL).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  })();
+
+  const platformRootDomain = (process.env.APP_ROOT_DOMAIN || appHostname || "localhost").toLowerCase();
+  const customDomain =
+    "customDomain" in tenant && typeof tenant.customDomain === "string"
+      ? tenant.customDomain
+      : null;
+
+  const targetHostWithoutPort = customDomain
+    ? customDomain.toLowerCase()
+    : `${tenant.slug}.${platformRootDomain}`;
+
+  const protocol = protocolHeader || (currentHostWithoutPort.includes("localhost") ? "http" : "https");
+
+  const targetHost =
+    currentPort && targetHostWithoutPort.includes("localhost")
+      ? `${targetHostWithoutPort}:${currentPort}`
+      : targetHostWithoutPort;
+
+  const isCanonicalHost = currentHostWithoutPort === targetHostWithoutPort;
+
+  if (!isCanonicalHost) {
+    permanentRedirect(`${protocol}://${targetHost}`);
+  }
+
+  const activeRaffle = tenant.raffles[0] ?? null;
   const tenantData = {
     id: tenant.id,
     name: tenant.name,
     slug: tenant.slug,
-    logoUrl: tenant.logoUrl,
-    instagramUrl: tenant.instagramUrl,
-    telegramUrl: tenant.telegramUrl,
+    logoUrl: tenant.logo,
+    instagramUrl: tenant.instagram,
+    telegramUrl: tenant.telegram,
     supportUrl: tenant.supportUrl,
-    isActive: tenant.isActive,
+    isActive: true,
     owner: {
       name: tenant.owner.name,
-      avatarUrl: tenant.owner.avatarUrl || null,
+      avatarUrl: tenant.owner.profile?.avatar || null,
     }
   };
 
   const raffleData = activeRaffle ? {
     id: activeRaffle.id,
-    title: activeRaffle.title,
+    title: activeRaffle.name,
+    slug: activeRaffle.slug,
     description: activeRaffle.description,
-    bannerUrl: activeRaffle.bannerUrl,
-    price: Number(activeRaffle.price),
-    minNumbers: activeRaffle.minNumbers,
-    totalNumbers: activeRaffle.totalNumbers,
-    status: activeRaffle.status,
+    bannerUrl: activeRaffle.banner,
+    price: Number(activeRaffle.priceTicket),
+    minNumbers: activeRaffle.minTickets,
+    totalNumbers: activeRaffle.maxTickets,
+    status: (activeRaffle.status === "CANCELED" ? "CANCELLED" : activeRaffle.status) as "DRAFT" | "ACTIVE" | "FINISHED" | "CANCELLED",
     drawDate: activeRaffle.drawDate,
-    nextTicketNumber: activeRaffle.nextTicketNumber,
-    mysteryBoxEnabled: activeRaffle.mysteryBoxEnabled,
-    mysteryBoxConfig: activeRaffle.mysteryBoxConfig,
-    winnerId: activeRaffle.winnerId,
-    pixText: activeRaffle.pixText,
-    mysteryPrizes: activeRaffle.mysteryPrizes || []
+    nextTicketNumber: 1,
+    mysteryBoxEnabled: false,
+    mysteryBoxConfig: null,
+    winnerId: null,
+    pixText: activeRaffle.pixValue.toString(),
+    mysteryPrizes: []
   } : null;
 
   return (
-    <div>
-      <AppContextProvider tenant={tenantData} raffle={raffleData || undefined}>
+    <AppContextProvider tenant={tenantData} raffle={raffleData || undefined}>
+      <div className="flex min-h-screen flex-col">
         <Header />
 
-        <Raffle />
-        <Footer />
-      </AppContextProvider>
+        <main className={activeRaffle ? "flex-1" : "flex flex-1 items-start justify-center px-4 pt-4 md:items-center md:pt-0"}>
+          {activeRaffle ? <Raffle /> : <NoRaffle />}
+        </main>
 
-    </div>
+        <Footer />
+      </div>
+    </AppContextProvider>
   );
 }

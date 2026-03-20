@@ -4,13 +4,15 @@ import { motion } from "motion/react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { MoreVertical, Ticket, UserIcon } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { useApp } from "@/contexts";
+import Link from "next/link";
 
 export function Header() {
   const { tenant, user } = useApp();
   const isAuthenticated = Boolean(user?.email);
   const userName = user?.name?.trim() || "Guest";
+  const profileHref = tenant?.slug ? `/${tenant.slug}/profile` : "/";
+  const loginHref = tenant?.slug ? `/${tenant.slug}/login` : "/";
 
   return (
     <motion.header
@@ -49,7 +51,7 @@ export function Header() {
           </button>
 
           <div className="relative">
-            <button aria-label="Minha conta">
+            <Link aria-label="Minha conta" href={isAuthenticated ? profileHref : loginHref}>
               <Avatar>
                 {isAuthenticated ? (
                   <>
@@ -65,7 +67,7 @@ export function Header() {
                   </AvatarFallback>
                 )}
               </Avatar>
-            </button>
+            </Link>
           </div>
         </div>
       </div>
