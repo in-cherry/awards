@@ -11,9 +11,28 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL não está definida.");
 }
 
+function envNumber(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const poolMax = envNumber("PG_POOL_MAX", 10);
+const idleTimeoutMillis = envNumber("PG_IDLE_TIMEOUT_MS", 30_000);
+const connectionTimeoutMillis = envNumber("PG_CONNECTION_TIMEOUT_MS", 10_000);
+const enableSsl = process.env.PG_SSL === "true";
+
 const pool =
   globalForPrisma.pool ??
-  new Pool({ connectionString: process.env.DATABASE_URL });
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: poolMax,
+    idleTimeoutMillis,
+    connectionTimeoutMillis,
+    keepAlive: true,
+    ssl: enableSsl ? { rejectUnauthorized: false } : undefined,
+  });
 
 const adapter = new PrismaPg(pool as any);
 

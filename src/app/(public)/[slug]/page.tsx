@@ -1,6 +1,7 @@
 import { Footer } from "@/components/tenant/footer";
 import { Header } from "@/components/tenant/header";
 import { NoRaffle } from "@/components/tenant/no-raffle";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/database/prisma";
 import { notFound, permanentRedirect } from "next/navigation";
 import { AppContextProvider } from "@/contexts";
@@ -11,34 +12,54 @@ interface TenantProps {
   params: Promise<{ slug: string }>
 }
 
+function isPrismaTimeoutError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1008";
+}
+
+async function findTenantBySlugWithRetry(slug: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await prisma.tenant.findUnique({
+        where: { slug },
+        include: {
+          owner: {
+            select: {
+              name: true,
+              profile: {
+                select: {
+                  avatar: true,
+                },
+              },
+            }
+          },
+          raffles: {
+            where: {
+              status: "ACTIVE",
+            },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          }
+        },
+      });
+    } catch (error) {
+      if (isPrismaTimeoutError(error) && attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return null;
+}
+
 export default async function Tenant({ params }: TenantProps) {
   const { slug } = await params;
   const headersList = await headers();
   const hostHeader = headersList.get("host") ?? "";
   const protocolHeader = headersList.get("x-forwarded-proto");
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug },
-    include: {
-      owner: {
-        select: {
-          name: true,
-          profile: {
-            select: {
-              avatar: true,
-            },
-          },
-        }
-      },
-      raffles: {
-        where: {
-          status: "ACTIVE",
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-      }
-    },
-  });
+  const tenant = await findTenantBySlugWithRetry(slug);
 
   if (!tenant) {
     notFound();
