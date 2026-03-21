@@ -3,10 +3,9 @@ import { Header } from "@/components/tenant/header";
 import { NoRaffle } from "@/components/tenant/no-raffle";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/database/prisma";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { AppContextProvider } from "@/contexts";
 import { Raffle } from "@/components/tenant/raffle";
-import { headers } from "next/headers";
 
 interface TenantProps {
   params: Promise<{ slug: string }>
@@ -55,49 +54,11 @@ async function findTenantBySlugWithRetry(slug: string) {
 
 export default async function Tenant({ params }: TenantProps) {
   const { slug } = await params;
-  const headersList = await headers();
-  const hostHeader = headersList.get("host") ?? "";
-  const protocolHeader = headersList.get("x-forwarded-proto");
 
   const tenant = await findTenantBySlugWithRetry(slug);
 
   if (!tenant) {
     notFound();
-  }
-
-  const currentHostWithoutPort = hostHeader.split(":")[0].toLowerCase();
-  const currentPort = hostHeader.includes(":") ? hostHeader.split(":")[1] : "";
-
-  const appHostname = (() => {
-    try {
-      if (!process.env.NEXT_PUBLIC_APP_URL) return null;
-      return new URL(process.env.NEXT_PUBLIC_APP_URL).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  })();
-
-  const platformRootDomain = (process.env.APP_ROOT_DOMAIN || appHostname || "localhost").toLowerCase();
-  const customDomain =
-    "customDomain" in tenant && typeof tenant.customDomain === "string"
-      ? tenant.customDomain
-      : null;
-
-  const targetHostWithoutPort = customDomain
-    ? customDomain.toLowerCase()
-    : `${tenant.slug}.${platformRootDomain}`;
-
-  const protocol = protocolHeader || (currentHostWithoutPort.includes("localhost") ? "http" : "https");
-
-  const targetHost =
-    currentPort && targetHostWithoutPort.includes("localhost")
-      ? `${targetHostWithoutPort}:${currentPort}`
-      : targetHostWithoutPort;
-
-  const isCanonicalHost = currentHostWithoutPort === targetHostWithoutPort;
-
-  if (!isCanonicalHost) {
-    permanentRedirect(`${protocol}://${targetHost}`);
   }
 
   const activeRaffle = tenant.raffles[0] ?? null;
