@@ -20,5 +20,21 @@ export default async function ClientLoginPage(props: { params: Params }) {
     }
   }
 
-  return <ClientLoginView slug={slug} />;
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug },
+    select: {
+      name: true,
+      logo: true,
+    },
+  });
+
+  return (
+    <ClientLoginView
+      slug={slug}
+      tenant={{
+        name: tenant?.name,
+        logoUrl: tenant?.logo ?? null,
+      }}
+    />
+  );
 }

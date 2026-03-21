@@ -10,6 +10,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
       where: { id: raffleId },
       select: {
         id: true,
+        mysteryPrizes: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            value: true,
+            remaining: true,
+            totalAmount: true,
+          },
+        },
       },
     });
 
@@ -21,9 +32,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
       success: true,
       raffle: {
         id: raffle.id,
-        mysteryBoxEnabled: false,
-        mysteryPrizes: [],
+        mysteryBoxEnabled: raffle.mysteryPrizes.length > 0,
       },
+      prizes: raffle.mysteryPrizes.map((prize) => ({
+        id: prize.id,
+        title: prize.name,
+        description:
+          prize.description ||
+          `Premio instantaneo de ${Number(prize.value).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          })}`,
+        remaining: prize.remaining,
+        totalAmount: prize.totalAmount,
+      })),
     });
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

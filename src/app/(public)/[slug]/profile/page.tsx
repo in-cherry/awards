@@ -22,5 +22,21 @@ export default async function ClientProfilePage(props: { params: Params }) {
     redirect(`/${slug}/login`);
   }
 
-  return <ClientProfileView slug={slug} />;
+  const tenantDetails = await prisma.tenant.findUnique({
+    where: { slug },
+    select: {
+      name: true,
+      logo: true,
+    },
+  });
+
+  return (
+    <ClientProfileView
+      slug={slug}
+      tenant={{
+        name: tenantDetails?.name,
+        logoUrl: tenantDetails?.logo ?? null,
+      }}
+    />
+  );
 }

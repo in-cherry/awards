@@ -40,6 +40,12 @@ type RaffleForm = {
   maxTickets: string;
 };
 
+type MysteryPrizeDraft = {
+  id: string;
+  name: string;
+  value: string;
+};
+
 type EditableField =
   | "banner"
   | "name"
@@ -74,6 +80,7 @@ export default function DashboardRafflesPage() {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [raffleToDelete, setRaffleToDelete] = useState<RaffleItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [mysteryPrizes, setMysteryPrizes] = useState<MysteryPrizeDraft[]>([]);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -141,6 +148,12 @@ export default function DashboardRafflesPage() {
           priceTicket: Number(form.priceTicket),
           minTickets: Number(form.minTickets),
           maxTickets: Number(form.maxTickets),
+          mysteryPrizes: mysteryPrizes
+            .map((prize) => ({
+              name: prize.name.trim(),
+              value: Number(prize.value),
+            }))
+            .filter((prize) => prize.name && Number.isFinite(prize.value) && prize.value > 0),
         }),
       });
 
@@ -152,6 +165,7 @@ export default function DashboardRafflesPage() {
       }
 
       setForm(initialForm);
+      setMysteryPrizes([]);
       setMessage("Rifa criada com sucesso.");
       await loadRaffles();
     } catch {
@@ -204,6 +218,27 @@ export default function DashboardRafflesPage() {
 
   function endEdit() {
     setEditingField(null);
+  }
+
+  function addMysteryPrize() {
+    setMysteryPrizes((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        name: "",
+        value: "",
+      },
+    ]);
+  }
+
+  function removeMysteryPrize(id: string) {
+    setMysteryPrizes((current) => current.filter((prize) => prize.id !== id));
+  }
+
+  function updateMysteryPrize(id: string, field: "name" | "value", value: string) {
+    setMysteryPrizes((current) =>
+      current.map((prize) => (prize.id === id ? { ...prize, [field]: value } : prize)),
+    );
   }
 
   return (
@@ -454,6 +489,52 @@ export default function DashboardRafflesPage() {
                   {currencyFormatter.format(checkoutMinPreview.total)}
                 </p>
               </div>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-slate-900/55 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Premios instantaneos das caixas</p>
+                <button
+                  type="button"
+                  onClick={addMysteryPrize}
+                  className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20"
+                >
+                  + Adicionar premio
+                </button>
+              </div>
+
+              {mysteryPrizes.length === 0 ? (
+                <p className="mt-3 text-xs text-slate-400">Nenhum premio instantaneo adicionado.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {mysteryPrizes.map((prize, index) => (
+                    <div key={prize.id} className="grid grid-cols-1 gap-2 rounded-lg border border-white/10 bg-slate-950/50 p-2 md:grid-cols-[1fr_160px_auto]">
+                      <input
+                        value={prize.name}
+                        onChange={(event) => updateMysteryPrize(prize.id, "name", event.target.value)}
+                        placeholder={`Premio ${index + 1}`}
+                        className="rounded-md border border-white/15 bg-slate-800/70 px-2 py-1.5 text-xs text-zinc-100"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={prize.value}
+                        onChange={(event) => updateMysteryPrize(prize.id, "value", event.target.value)}
+                        placeholder="Valor (R$)"
+                        className="rounded-md border border-white/15 bg-slate-800/70 px-2 py-1.5 text-xs text-zinc-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeMysteryPrize(prize.id)}
+                        className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-300 hover:bg-red-500/20"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button

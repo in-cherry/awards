@@ -1,9 +1,11 @@
 import prisma from "@/lib/database/prisma";
 import { NextResponse } from "next/server";
+import { getClientAuthUser } from "@/lib/auth/mddleware";
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
+    const authClient = await getClientAuthUser();
 
     const tenant = await prisma.tenant.findUnique({
       where: { slug }
@@ -14,8 +16,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     }
 
     const ranking = await prisma.client.findMany({
-      where: { tenantId: tenant.id },
+      where: {
+        tenantId: tenant.id,
+        tickets: {
+          some: {},
+        },
+      },
       select: {
+        id: true,
         name: true,
         _count: {
           select: { tickets: true }
@@ -23,7 +31,56 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       },
       orderBy: { tickets: { _count: "desc" } },
       take: 3
-    })
+    });
+
+    let userPosition: { position: number; tickets: number } | null = null;
+
+    if (authClient && authClient.tenantId === tenant.id) {
+      const userWithTicketCount = await prisma.client.findFirst({
+        where: {
+          id: authClient.userId,
+          tenantId: tenant.id,
+        },
+        select: {
+          id: true,
+          _count: {
+            select: { tickets: true },
+          },
+        },
+      });
+
+      const currentUserTickets = userWithTicketCount?._count.tickets ?? 0;
+
+      if (currentUserTickets > 0) {
+        const fullRanking = await prisma.client.findMany({
+          where: {
+            tenantId: tenant.id,
+            tickets: {
+              some: {},
+            },
+          },
+          select: {
+            id: true,
+            _count: {
+              select: { tickets: true },
+            },
+          },
+          orderBy: [
+            { tickets: { _count: "desc" } },
+            { createdAt: "asc" },
+          ],
+        });
+
+        const index = fullRanking.findIndex((entry) => entry.id === authClient.userId);
+
+        if (index >= 0) {
+          userPosition = {
+            position: index + 1,
+            tickets: currentUserTickets,
+          };
+        }
+      }
+    }
 
     const formattedRanking = ranking.map((entry, index) => {
       const [firstName, lastName] = entry.name.trim().split(/\s+/);
@@ -39,7 +96,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       };
     });
 
-    return NextResponse.json({ success: true, ranking: formattedRanking });
+    return NextResponse.json({
+      success: true,
+      ranking: formattedRanking,
+      userPosition,
+    });
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

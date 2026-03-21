@@ -202,8 +202,9 @@ model Raffle {
   minTickets  Int          @default(1)
   maxTickets  Int
 
-  awards  Award[]
-  tickets Ticket[]
+  awards       Award[]
+  tickets      Ticket[]
+  mysteryPrizes MysteryPrize[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -211,6 +212,22 @@ model Raffle {
   @@unique([tenantId, slug])
   @@index([tenantId, createdAt])
   @@map("raffles")
+}
+
+model MysteryPrize {
+  id          String  @id @default(cuid())
+  raffle      Raffle  @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  raffleId    String
+  name        String
+  description String?
+  value       Decimal @db.Decimal(10, 2)
+  remaining   Int     @default(1)
+  totalAmount Int     @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([raffleId, createdAt])
+  @@map("mystery_prizes")
 }
 
 model Ticket {

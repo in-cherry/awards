@@ -4,9 +4,10 @@ import { useApp } from "@/contexts";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Award, BadgeCheck, CircleHelp, Gift, Instagram, MessageCircle, Minus, Plus, ShoppingBag, Ticket, Trophy, Users } from "lucide-react";
+import { Award, BadgeCheck, CircleHelp, Gift, Instagram, MessageCircle, Minus, Plus, ShoppingBag, Ticket, Trophy, Users, X } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 type RankingEntry = {
   position: number;
@@ -15,12 +16,45 @@ type RankingEntry = {
   color?: string;
 };
 
+type RankingResponse = {
+  success?: boolean;
+  ranking?: RankingEntry[];
+  userPosition?: {
+    position: number;
+    tickets: number;
+  } | null;
+};
+
 type MysteryPrize = {
   id: string;
   title: string;
   description: string | null;
   remaining: number;
   totalAmount: number;
+};
+
+type PixPaymentInfo = {
+  paymentId: string;
+  totalValue: number;
+  qrCode: string;
+  qrCodeBase64: string;
+  createdAt?: string;
+};
+
+type PixPaymentApiResponse = {
+  success?: boolean;
+  error?: string;
+  code?: string;
+  message?: string;
+  payment?: {
+    id: string;
+    externalId?: string | null;
+    totalValue: number;
+    qrCode: string;
+    qrCodeBase64: string;
+    status?: string;
+    createdAt?: string;
+  };
 };
 
 export function Raffle() {
@@ -36,16 +70,18 @@ export function Raffle() {
   }, [raffle?.description]);
 
   const [rankingList, setRankingList] = useState<RankingEntry[]>([]);
+  const [userRankingPosition, setUserRankingPosition] = useState<{
+    position: number;
+    tickets: number;
+  } | null>(null);
   const [prizes, setPrizes] = useState<MysteryPrize[]>([]);
   const [isOwnerCardOpen, setIsOwnerCardOpen] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [checkoutInfo, setCheckoutInfo] = useState<{
-    paymentId: string;
-    totalValue: number;
-    qrCode: string;
-    qrCodeBase64: string;
-  } | null>(null);
+  const [checkoutInfo, setCheckoutInfo] = useState<PixPaymentInfo | null>(null);
+  const [pendingPaymentOffer, setPendingPaymentOffer] = useState<PixPaymentInfo | null>(null);
+  const [pixDialogOpen, setPixDialogOpen] = useState(false);
+  const [pixDialogMinimized, setPixDialogMinimized] = useState(false);
 
   useEffect(() => {
     async function fetchRanking() {
@@ -53,8 +89,9 @@ export function Raffle() {
       try {
         const res = await fetch(`/api/ranking/${tenant.slug}`);
         if (res.ok) {
-          const data = await res.json();
-          setRankingList(data.ranking);
+          const data = (await res.json()) as RankingResponse;
+          setRankingList(data.ranking || []);
+          setUserRankingPosition(data.userPosition ?? null);
         }
       } catch (e) {
         console.error('Failed to fetch ranking', e);
@@ -101,11 +138,10 @@ export function Raffle() {
 
   if (!raffle) return null;
 
-  async function handlePixPayment() {
+  async function requestPixPayment(forceNewPayment: boolean) {
     if (!raffle || !tenant) return;
 
     setCheckoutError(null);
-    setCheckoutInfo(null);
 
     if (!user?.name || !user?.email || !user?.cpf || !user?.phone) {
       setCheckoutError("Para pagar com PIX, complete seu cadastro com nome, email, CPF e telefone.");
@@ -122,6 +158,7 @@ export function Raffle() {
           raffleId: raffle.id,
           ticketCount,
           totalValue: Number((Number(raffle.price) * ticketCount).toFixed(2)),
+          forceNewPayment,
           customer: {
             name: user.name,
             email: user.email,
@@ -131,24 +168,68 @@ export function Raffle() {
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as PixPaymentApiResponse;
+
+      if (response.status === 409 && data.code === "PENDING_PAYMENT_EXISTS" && data.payment) {
+        setPendingPaymentOffer({
+          paymentId: data.payment.id,
+          totalValue: Number(data.payment.totalValue || 0),
+          qrCode: data.payment.qrCode || "",
+          qrCodeBase64: data.payment.qrCodeBase64 || "",
+          createdAt: data.payment.createdAt,
+        });
+        setCheckoutInfo(null);
+        setPixDialogMinimized(false);
+        setPixDialogOpen(true);
+        return;
+      }
 
       if (!response.ok || !data.success) {
         setCheckoutError(data.error || "Nao foi possivel gerar o PIX.");
         return;
       }
 
+      if (!data.payment) {
+        setCheckoutError("Nao foi possivel montar os dados do PIX.");
+        return;
+      }
+
+      setPendingPaymentOffer(null);
+
       setCheckoutInfo({
         paymentId: data.payment.id,
-        totalValue: Number(data.payment.totalValue),
+        totalValue: Number(data.payment.totalValue || 0),
         qrCode: data.payment.qrCode || "",
         qrCodeBase64: data.payment.qrCodeBase64 || "",
+        createdAt: data.payment.createdAt,
       });
+      setPixDialogMinimized(false);
+      setPixDialogOpen(true);
     } catch {
       setCheckoutError("Erro de conexao ao gerar pagamento PIX.");
     } finally {
       setIsPaying(false);
     }
+  }
+
+  async function handlePixPayment() {
+    setCheckoutInfo(null);
+    setPendingPaymentOffer(null);
+    await requestPixPayment(false);
+  }
+
+  function minimizePixDialog() {
+    setPixDialogOpen(false);
+    if (checkoutInfo || pendingPaymentOffer) {
+      setPixDialogMinimized(true);
+    }
+  }
+
+  function closePixDialogCompletely() {
+    setPixDialogOpen(false);
+    setPixDialogMinimized(false);
+    setCheckoutInfo(null);
+    setPendingPaymentOffer(null);
   }
 
   return (
@@ -278,7 +359,6 @@ export function Raffle() {
       </div>
 
       {/* Ranking */}
-      {/* FALTA CRIAR API DE CONSUMO DE RANKING */}
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-6 shadow-lg backdrop-blur-xl">
         <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
           <div className="flex items-center">
@@ -330,7 +410,14 @@ export function Raffle() {
               ))}
               {user && (
                 <div className="py-2.5 text-center bg-transparent border-t border-white/5">
-                  <p className="text-[9px] text-stone-500 font-medium">Sua posição: #</p>
+                  {userRankingPosition ? (
+                    <>
+                      <p className="text-[9px] text-stone-500 font-medium">Sua posicao: #{userRankingPosition.position}</p>
+                      <p className="text-[10px] text-stone-400">{userRankingPosition.tickets.toLocaleString("pt-BR")} bilhetes</p>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-stone-400">Voce ainda nao possui bilhetes para entrar no ranking.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -479,29 +566,132 @@ export function Raffle() {
             {checkoutError}
           </div>
         )}
-
-        {checkoutInfo && (
-          <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-3">
-            <p className="text-xs uppercase text-emerald-300">PIX gerado</p>
-            <p className="mt-1 text-sm text-zinc-100">Pagamento: {checkoutInfo.paymentId}</p>
-            <p className="text-sm text-zinc-100">Total: {formatCurrency(checkoutInfo.totalValue)}</p>
-            {checkoutInfo.qrCodeBase64 ? (
-              <Image
-                src={`data:image/png;base64,${checkoutInfo.qrCodeBase64}`}
-                alt="QR Code PIX"
-                width={160}
-                height={160}
-                unoptimized
-                className="mt-3 h-40 w-40 rounded-lg border border-white/10 bg-white p-2"
-              />
-            ) : null}
-            {checkoutInfo.qrCode ? (
-              <p className="mt-3 break-all text-xs text-slate-200">{checkoutInfo.qrCode}</p>
-            ) : null}
-          </div>
-        )}
-
       </div>
+
+      <Dialog.Root
+        open={pixDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            minimizePixDialog();
+            return;
+          }
+
+          setPixDialogOpen(true);
+          setPixDialogMinimized(false);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl outline-none">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <Dialog.Title className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
+                  Pagamento PIX
+                </Dialog.Title>
+                <Dialog.Description className="text-xs text-slate-400">
+                  Copie o codigo ou escaneie o QR Code para pagar.
+                </Dialog.Description>
+              </div>
+
+              <button
+                type="button"
+                onClick={minimizePixDialog}
+                className="rounded-md border border-white/15 p-1 text-slate-300 hover:bg-white/10 hover:text-white"
+                aria-label="Minimizar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {pendingPaymentOffer && !checkoutInfo ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  Ja existe um pagamento pendente para esta mesma quantidade de bilhetes. Deseja continuar com ele?
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                  <p className="text-xs text-slate-300">Pagamento: {pendingPaymentOffer.paymentId}</p>
+                  <p className="text-xs text-slate-300">Total: {formatCurrency(pendingPaymentOffer.totalValue)}</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutInfo(pendingPaymentOffer);
+                      setPendingPaymentOffer(null);
+                    }}
+                    className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+                  >
+                    Usar pagamento em aberto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => requestPixPayment(true)}
+                    disabled={isPaying}
+                    className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 disabled:opacity-60"
+                  >
+                    {isPaying ? "Gerando..." : "Gerar novo PIX"}
+                  </button>
+                </div>
+              </div>
+            ) : checkoutInfo ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-3">
+                  <p className="text-xs uppercase text-emerald-300">PIX gerado</p>
+                  <p className="mt-1 text-sm text-zinc-100">Pagamento: {checkoutInfo.paymentId}</p>
+                  <p className="text-sm text-zinc-100">Total: {formatCurrency(checkoutInfo.totalValue)}</p>
+                </div>
+
+                {checkoutInfo.qrCodeBase64 ? (
+                  <div className="flex justify-center">
+                    <Image
+                      src={`data:image/png;base64,${checkoutInfo.qrCodeBase64}`}
+                      alt="QR Code PIX"
+                      width={200}
+                      height={200}
+                      unoptimized
+                      className="h-48 w-48 rounded-lg border border-white/10 bg-white p-2"
+                    />
+                  </div>
+                ) : null}
+
+                {checkoutInfo.qrCode ? (
+                  <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                    <p className="text-[11px] uppercase text-slate-400">Codigo copia e cola</p>
+                    <p className="mt-2 break-all text-xs text-slate-200">{checkoutInfo.qrCode}</p>
+                  </div>
+                ) : null}
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={closePixDialogCompletely}
+                    className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-100 hover:bg-white/10"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-300">Nenhum pagamento carregado.</p>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {pixDialogMinimized && (checkoutInfo || pendingPaymentOffer) ? (
+        <button
+          type="button"
+          onClick={() => {
+            setPixDialogOpen(true);
+            setPixDialogMinimized(false);
+          }}
+          className="fixed bottom-4 right-4 z-40 rounded-full border border-emerald-300/25 bg-emerald-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-200 shadow-lg backdrop-blur"
+        >
+          Abrir pagamento PIX
+        </button>
+      ) : null}
     </motion.div >
   );
 }

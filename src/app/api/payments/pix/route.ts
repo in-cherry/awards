@@ -5,6 +5,7 @@ type PaymentPayload = {
   raffleId?: string;
   ticketCount?: number;
   totalValue?: number;
+  forceNewPayment?: boolean;
   customer?: {
     name?: string;
     email?: string;
@@ -16,6 +17,11 @@ type PaymentPayload = {
 type MercadoPagoPaymentResponse = {
   id?: number;
   status?: string;
+  metadata?: {
+    raffleId?: string;
+    clientId?: string;
+    ticketCount?: number;
+  };
   point_of_interaction?: {
     transaction_data?: {
       qr_code?: string;
@@ -54,6 +60,102 @@ function getBaseUrl(request: NextRequest): string {
   const host = request.headers.get("host") || "localhost:3000";
   const protocol = host.includes("localhost") ? "http" : "https";
   return `${protocol}://${host}`;
+}
+
+function isOpenMercadoPagoStatus(status: string | undefined): boolean {
+  if (!status) return true;
+  return status === "pending" || status === "in_process" || status === "authorized";
+}
+
+function mapMercadoPagoStatusToInternal(status: string | undefined): "PENDING" | "COMPLETED" | "FAILED" | "CANCELED" {
+  switch (status) {
+    case "approved":
+      return "COMPLETED";
+    case "rejected":
+      return "FAILED";
+    case "cancelled":
+    case "refunded":
+    case "charged_back":
+      return "CANCELED";
+    default:
+      return "PENDING";
+  }
+}
+
+async function getReusablePendingPayment(args: {
+  tenantId: string;
+  clientId: string;
+  raffleId: string;
+  ticketCount: number;
+  mpAccessToken: string;
+}) {
+  const pendingPayments = await prisma.payment.findMany({
+    where: {
+      tenantId: args.tenantId,
+      clientId: args.clientId,
+      method: "PIX",
+      status: "PENDING",
+      amount: args.ticketCount,
+      externalId: {
+        not: null,
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    select: {
+      id: true,
+      externalId: true,
+      totalValue: true,
+      createdAt: true,
+    },
+  });
+
+  for (const pendingPayment of pendingPayments) {
+    if (!pendingPayment.externalId) continue;
+
+    const mpLookup = await fetch(`https://api.mercadopago.com/v1/payments/${pendingPayment.externalId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${args.mpAccessToken}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!mpLookup.ok) {
+      continue;
+    }
+
+    const mpData = (await mpLookup.json()) as MercadoPagoPaymentResponse;
+    const internalStatus = mapMercadoPagoStatusToInternal(mpData.status);
+
+    if (internalStatus !== "PENDING") {
+      await prisma.payment.update({
+        where: { id: pendingPayment.id },
+        data: { status: internalStatus },
+      });
+      continue;
+    }
+
+    const raffleIdFromMetadata = String(mpData.metadata?.raffleId || "").trim();
+    const isSameRaffle = raffleIdFromMetadata === args.raffleId;
+    const isStillOpen = isOpenMercadoPagoStatus(mpData.status);
+
+    if (!isSameRaffle || !isStillOpen) {
+      continue;
+    }
+
+    return {
+      id: pendingPayment.id,
+      externalId: pendingPayment.externalId,
+      totalValue: Number(pendingPayment.totalValue),
+      qrCode: mpData.point_of_interaction?.transaction_data?.qr_code ?? "",
+      qrCodeBase64: mpData.point_of_interaction?.transaction_data?.qr_code_base64 ?? "",
+      status: mpData.status ?? "pending",
+      createdAt: pendingPayment.createdAt.toISOString(),
+    };
+  }
+
+  return null;
 }
 
 async function createMercadoPagoPixPayment(args: {
@@ -125,6 +227,7 @@ export async function POST(request: NextRequest) {
     const raffleId = String(body.raffleId || "").trim();
     const ticketCount = Number(body.ticketCount || 0);
     const totalValueFromClient = Number(body.totalValue || 0);
+    const forceNewPayment = Boolean(body.forceNewPayment);
 
     if (!raffleId) {
       return NextResponse.json({ success: false, error: "Rifa invalida." }, { status: 400 });
@@ -245,6 +348,28 @@ export async function POST(request: NextRequest) {
     const feePercentage = Math.min(Math.max(Number(process.env.PLATFORM_FEE_PERCENTAGE || 0), 0), 100);
     const platformFeeValue = Number(((expectedTotal * feePercentage) / 100).toFixed(2));
     const sellerNetValue = Number((expectedTotal - platformFeeValue).toFixed(2));
+
+    if (!forceNewPayment) {
+      const pendingPayment = await getReusablePendingPayment({
+        tenantId: raffle.tenantId,
+        clientId: client.id,
+        raffleId: raffle.id,
+        ticketCount,
+        mpAccessToken: mpConnection.accessToken,
+      });
+
+      if (pendingPayment) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "PENDING_PAYMENT_EXISTS",
+            message: "Ja existe um pagamento pendente com esta mesma quantidade de bilhetes.",
+            payment: pendingPayment,
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     const nameParts = splitName(customerName);
     const externalReference = `${raffle.tenantId}:${raffle.id}:${client.id}:${Date.now()}`;

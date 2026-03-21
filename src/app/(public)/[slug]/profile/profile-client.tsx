@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
+import { TenantLogoHeader } from "@/components/tenant/tenant-logo-header";
 
 type MeResponse = {
   success: boolean;
@@ -52,9 +54,13 @@ type MeResponse = {
 
 type ClientProfileViewProps = {
   slug: string;
+  tenant?: {
+    name?: string;
+    logoUrl?: string | null;
+  };
 };
 
-export function ClientProfileView({ slug }: ClientProfileViewProps) {
+export function ClientProfileView({ slug, tenant }: ClientProfileViewProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -155,36 +161,78 @@ export function ClientProfileView({ slug }: ClientProfileViewProps) {
   if (loading) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-4 py-10">
-        <p className="text-sm text-slate-300">Carregando seu perfil...</p>
+        <motion.p
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="text-sm text-slate-300"
+        >
+          Carregando seu perfil...
+        </motion.p>
       </main>
     );
   }
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 md:px-6 md:py-10">
-      <header className="mb-6 rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <TenantLogoHeader
+          href={`/${slug}`}
+          logoUrl={tenant?.logoUrl}
+          tenantName={tenant?.name}
+        />
+      </motion.div>
+
+      <motion.header
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="mb-6 rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-sm"
+      >
         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Area do participante</p>
         <h1 className="mt-2 text-2xl font-bold uppercase text-zinc-100">Meu perfil</h1>
-        <p className="mt-2 text-sm text-slate-300">Organizacao: /{slug}</p>
-      </header>
+      </motion.header>
 
       {error && <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
       {message && <p className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{message}</p>}
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+        className="grid gap-4 md:grid-cols-3"
+      >
+        <motion.article
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.25, duration: 0.3 }}
+          className="rounded-2xl border border-white/10 bg-slate-900/40 p-4"
+        >
           <p className="text-xs uppercase tracking-widest text-slate-400">Bilhetes totais</p>
           <p className="mt-2 text-3xl font-bold text-zinc-100">{summary?.totalTickets ?? 0}</p>
-        </article>
-        <article className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+        </motion.article>
+        <motion.article
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
+          className="rounded-2xl border border-white/10 bg-slate-900/40 p-4"
+        >
           <p className="text-xs uppercase tracking-widest text-slate-400">Rifas participadas</p>
           <p className="mt-2 text-3xl font-bold text-zinc-100">{summary?.rafflesParticipated ?? 0}</p>
-        </article>
-        <article className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+        </motion.article>
+        <motion.article
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.35, duration: 0.3 }}
+          className="rounded-2xl border border-white/10 bg-slate-900/40 p-4"
+        >
           <p className="text-xs uppercase tracking-widest text-slate-400">Premios ganhos</p>
           <p className="mt-2 text-3xl font-bold text-zinc-100">{summary?.winsCount ?? 0}</p>
-        </article>
-      </section>
+        </motion.article>
+      </motion.section>
 
       <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <div className="space-y-6">

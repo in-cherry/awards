@@ -127,6 +127,24 @@ export async function POST(request: NextRequest) {
   const priceTicket = Number(payload?.priceTicket ?? 0);
   const minTickets = Number(payload?.minTickets ?? 100);
   const maxTickets = Number(payload?.maxTickets ?? 1_000_000);
+  const mysteryPrizesRaw = Array.isArray(payload?.mysteryPrizes) ? payload.mysteryPrizes : [];
+  const mysteryPrizes: Array<{ name: string; value: number; description: string | null }> = mysteryPrizesRaw
+    .map((item: unknown) => {
+      const entry = item as { name?: unknown; value?: unknown; description?: unknown };
+      const prizeName = String(entry?.name ?? "").trim();
+      const prizeValue = Number(entry?.value ?? 0);
+      const prizeDescription = entry?.description ? String(entry.description).trim() : null;
+
+      return {
+        name: prizeName,
+        value: prizeValue,
+        description: prizeDescription,
+      };
+    })
+    .filter(
+      (item: { name: string; value: number; description: string | null }) =>
+        item.name.length > 0 && Number.isFinite(item.value) && item.value > 0,
+    );
 
   if (!name) {
     return NextResponse.json({ success: false, error: "Informe o nome da rifa." }, { status: 400 });
@@ -171,6 +189,17 @@ export async function POST(request: NextRequest) {
       minTickets,
       maxTickets,
       status: "ACTIVE",
+      mysteryPrizes: mysteryPrizes.length
+        ? {
+          create: mysteryPrizes.map((prize) => ({
+            name: prize.name,
+            description: prize.description,
+            value: prize.value,
+            totalAmount: 1,
+            remaining: 1,
+          })),
+        }
+        : undefined,
     },
     select: {
       id: true,
