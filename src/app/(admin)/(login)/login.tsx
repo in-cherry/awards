@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
+import { formatCPFInput, formatPhoneInput, onlyDigits } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
 type LoginApiResponse = {
@@ -63,7 +64,7 @@ export function Login({ mode = "login" }: { mode?: "login" | "register" }) {
 
     try {
       const payload = isRegister
-        ? { email, password, name, phone, cpf }
+        ? { email, password, name, phone: onlyDigits(phone), cpf: onlyDigits(cpf) }
         : { email, password };
 
       const response = await fetch(`/api/auth/${isRegister ? "register" : "login"}`, {
@@ -127,20 +128,22 @@ export function Login({ mode = "login" }: { mode?: "login" | "register" }) {
               <input
                 type="tel"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => setPhone(formatPhoneInput(event.target.value))}
                 className="p-2 block w-full rounded-2xl border border-white/5 bg-slate-800/40 text-sm text-gray-300 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="(00) 00000-0000"
                 autoComplete="tel"
+                maxLength={15}
               />
 
               <label className="block mb-2 text-sm font-mono font-medium text-gray-300">CPF</label>
               <input
                 type="text"
                 value={cpf}
-                onChange={(event) => setCpf(event.target.value)}
+                onChange={(event) => setCpf(formatCPFInput(event.target.value))}
                 className="p-2 block w-full rounded-2xl border border-white/5 bg-slate-800/40 text-sm text-gray-300 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="000.000.000-00"
                 autoComplete="off"
+                maxLength={14}
               />
             </>
           )}
