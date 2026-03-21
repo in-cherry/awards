@@ -35,20 +35,22 @@ function parseState(state: string | null): { tenantId: string; userId: string } 
 }
 
 export async function GET(request: NextRequest) {
+  const baseUrl = getBaseUrl(request);
+  
   const authUser = await getAuthUser();
   if (!authUser) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", baseUrl));
   }
 
   const code = request.nextUrl.searchParams.get("code");
   const state = parseState(request.nextUrl.searchParams.get("state"));
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL("/dashboard/settings?mp=invalid-callback", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?mp=invalid-callback", baseUrl));
   }
 
   if (state.userId !== authUser.userId) {
-    return NextResponse.redirect(new URL("/dashboard/settings?mp=state-mismatch", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?mp=state-mismatch", baseUrl));
   }
 
   const tenant = await prisma.tenant.findFirst({
@@ -70,15 +72,15 @@ export async function GET(request: NextRequest) {
   });
 
   if (!tenant) {
-    return NextResponse.redirect(new URL("/dashboard/settings?mp=tenant-not-found", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?mp=tenant-not-found", baseUrl));
   }
 
   const clientId = process.env.MP_CLIENT_ID;
   const clientSecret = process.env.MP_CLIENT_SECRET;
-  const redirectUri = process.env.MP_REDIRECT_URI || `${getBaseUrl(request)}/api/auth/mercadopago/callback`;
+  const redirectUri = process.env.MP_REDIRECT_URI || `${baseUrl}/api/auth/mercadopago/callback`;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/dashboard/settings?mp=missing-credentials", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?mp=missing-credentials", baseUrl));
   }
 
   const tokenResponse = await fetch("https://api.mercadopago.com/oauth/token", {
@@ -97,13 +99,13 @@ export async function GET(request: NextRequest) {
   });
 
   if (!tokenResponse.ok) {
-    return NextResponse.redirect(new URL("/dashboard/settings?mp=token-exchange-failed", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?mp=token-exchange-failed", baseUrl));
   }
 
   const tokenData = (await tokenResponse.json()) as MercadoPagoOAuthResponse;
 
   if (!tokenData.access_token || !tokenData.user_id) {
-    return NextResponse.redirect(new URL("/dashboard/settings?mp=invalid-token", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?mp=invalid-token", baseUrl));
   }
 
   const expiresAt = tokenData.expires_in
@@ -136,5 +138,5 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return NextResponse.redirect(new URL("/dashboard/settings?mp=connected", request.url));
+  return NextResponse.redirect(new URL("/dashboard/settings?mp=connected", baseUrl));
 }
