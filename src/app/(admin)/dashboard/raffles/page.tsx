@@ -133,7 +133,7 @@ export default function DashboardRafflesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [mercadoPagoConnected, setMercadoPagoConnected] = useState(false);
+  const [mercadoPagoConnected, setMercadoPagoConnected] = useState<boolean | null>(null);
   const [tenantName, setTenantName] = useState("Sua organizacao");
   const [tenantSlug, setTenantSlug] = useState("seu-slug");
   const [editingField, setEditingField] = useState<EditableField>(null);
@@ -463,7 +463,7 @@ export default function DashboardRafflesPage() {
         <p className="mt-2 text-sm text-slate-300">Crie e gerencie rifas de forma dinamica e interativa.</p>
       </div>
 
-      {!mercadoPagoConnected && (
+      {mercadoPagoConnected === false && (
         <div className="mb-6 rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">
           <p className="font-medium">Conexao Mercado Pago obrigatoria</p>
           <p className="mt-1 text-amber-100/90">
@@ -850,7 +850,7 @@ export default function DashboardRafflesPage() {
                 disabled={saving || !mercadoPagoConnected}
                 className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {saving ? "Criando..." : !mercadoPagoConnected ? "Conecte o Mercado Pago para criar" : "Criar rifa"}
+                {saving ? "Criando..." : mercadoPagoConnected === false ? "Conecte o Mercado Pago para criar" : mercadoPagoConnected === null ? "Verificando..." : "Criar rifa"}
               </button>
             </div>
           </div>

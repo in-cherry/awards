@@ -82,6 +82,49 @@ function mapMercadoPagoStatusToInternal(status: string | undefined): "PENDING" |
   }
 }
 
+async function validateNoDuplicatePayment(args: {
+  clientId: string;
+  ticketCount: number;
+  totalValue: number;
+}): Promise<{ isDuplicate: boolean; reason?: string }> {
+  // Verificar se existe um pagamento pendente EXATO (mesmo valor)
+  const pendingExact = await prisma.payment.findFirst({
+    where: {
+      clientId: args.clientId,
+      status: "PENDING",
+      amount: args.ticketCount,
+      totalValue: args.totalValue.toString(),
+    },
+  });
+
+  if (pendingExact) {
+    return {
+      isDuplicate: true,
+      reason: "Ja existe um pagamento pendente identico para este cliente",
+    };
+  }
+
+  // Verificar se há múltiplos pagamentos pendentes com mesmo cliente (proteção contra abuso)
+  const pendingCount = await prisma.payment.count({
+    where: {
+      clientId: args.clientId,
+      status: "PENDING",
+      createdAt: {
+        gte: new Date(Date.now() - 30 * 60 * 1000), // Ultimos 30 minutos
+      },
+    },
+  });
+
+  if (pendingCount >= 5) {
+    return {
+      isDuplicate: true,
+      reason: "Muitos pagamentos pendentes. Aguarde a confirmacao dos anteriores.",
+    };
+  }
+
+  return { isDuplicate: false };
+}
+
 async function getReusablePendingPayment(args: {
   tenantId: string;
   clientId: string;
@@ -348,6 +391,24 @@ export async function POST(request: NextRequest) {
     const feePercentage = Math.min(Math.max(Number(process.env.PLATFORM_FEE_PERCENTAGE || 0), 0), 100);
     const platformFeeValue = Number(((expectedTotal * feePercentage) / 100).toFixed(2));
     const sellerNetValue = Number((expectedTotal - platformFeeValue).toFixed(2));
+
+    // Validar segurança: verificar pagamentos duplicados
+    const duplicateCheck = await validateNoDuplicatePayment({
+      clientId: client.id,
+      ticketCount,
+      totalValue: expectedTotal,
+    });
+
+    if (duplicateCheck.isDuplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "DUPLICATE_PAYMENT",
+          error: duplicateCheck.reason || "Pagamento duplicado detectado",
+        },
+        { status: 409 },
+      );
+    }
 
     if (!forceNewPayment) {
       const pendingPayment = await getReusablePendingPayment({

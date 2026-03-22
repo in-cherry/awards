@@ -73,6 +73,18 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            status: true,
+            totalValue: true,
+            method: true,
+            amount: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
@@ -127,13 +139,19 @@ export async function GET(request: NextRequest) {
         email: client.email,
         phone: client.phone,
         cpf: client.cpf,
-        profile: {
-          nickname: client.profile?.nickname ?? null,
-          avatar: client.profile?.avatar ?? null,
-          banner: client.profile?.banner ?? null,
-        },
+        nickname: client.profile?.nickname ?? null,
+        avatar: client.profile?.avatar ?? null,
+        banner: client.profile?.banner ?? null,
       },
-      tenant,
+      tenantName: tenant.name,
+      summary: {
+        totalTickets: client.tickets.length,
+        paidTickets: client.tickets.filter(t => t.payment?.status === "COMPLETED").length,
+        pendingTickets: client.tickets.filter(t => !t.payment || t.payment.status === "PENDING").length,
+        rafflesParticipated: raffleMap.size,
+        totalSpent: Array.from(raffleMap.values()).reduce((sum, r) => sum + r.totalSpent, 0),
+        winsCount: client.awards.length,
+      },
       awards: client.awards.map((award) => ({
         id: award.id,
         name: award.name,
@@ -158,6 +176,14 @@ export async function GET(request: NextRequest) {
           : null,
       })),
       raffles: Array.from(raffleMap.values()).sort((a, b) => (b.lastTicketAt || "").localeCompare(a.lastTicketAt || "")),
+      payments: client.payments.map((payment) => ({
+        id: payment.id,
+        status: payment.status,
+        totalValue: Number(payment.totalValue),
+        method: payment.method,
+        ticketCount: payment.amount,
+        createdAt: payment.createdAt.toISOString(),
+      })),
     });
   } catch (error) {
     console.error("Erro ao buscar perfil do cliente:", error);
