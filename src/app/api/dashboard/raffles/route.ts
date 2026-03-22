@@ -4,6 +4,9 @@ import prisma from "@/lib/database/prisma";
 import { getAuthUser } from "@/lib/auth/mddleware";
 import { getActiveTenantCookieName } from "@/lib/auth/jwt";
 
+const MYSTERY_PRIZE_TYPE_MONETARY = "[[TYPE:MONETARY]]";
+const MYSTERY_PRIZE_TYPE_PHYSICAL = "[[TYPE:PHYSICAL]]";
+
 function slugify(value: string): string {
   return value
     .normalize("NFD")
@@ -212,11 +215,13 @@ export async function POST(request: NextRequest) {
       ? Number(payload.collaboratorPrizeThird)
       : null;
   const mysteryPrizesRaw = Array.isArray(payload?.mysteryPrizes) ? payload.mysteryPrizes : [];
-  const mysteryPrizes: Array<{ name: string; value: number; chance: number; description: string | null }> = mysteryPrizesRaw
+  const mysteryPrizes: Array<{ name: string; value: number; chance: number; description: string | null; prizeType: "MONETARY" | "PHYSICAL" }> = mysteryPrizesRaw
     .map((item: unknown) => {
-      const entry = item as { name?: unknown; value?: unknown; chance?: unknown; description?: unknown };
+      const entry = item as { name?: unknown; prizeType?: unknown; value?: unknown; chance?: unknown; description?: unknown };
       const prizeName = String(entry?.name ?? "").trim();
-      const prizeValue = Number(entry?.value ?? 0);
+      const prizeType = String(entry?.prizeType ?? "PHYSICAL").trim().toUpperCase() === "MONETARY" ? "MONETARY" : "PHYSICAL";
+      const rawPrizeValue = Number(entry?.value ?? 0);
+      const prizeValue = Number.isFinite(rawPrizeValue) ? Math.max(rawPrizeValue, 0) : Number.NaN;
       const prizeChance = Number(entry?.chance ?? 0.1);
       const prizeDescription = entry?.description ? String(entry.description).trim() : null;
 
@@ -225,27 +230,32 @@ export async function POST(request: NextRequest) {
         value: prizeValue,
         chance: prizeChance,
         description: prizeDescription,
+        prizeType,
       };
     })
     .filter(
-      (item: { name: string; value: number; chance: number; description: string | null }) =>
+      (item: { name: string; value: number; chance: number; description: string | null; prizeType: "MONETARY" | "PHYSICAL" }) =>
         item.name.length > 0 &&
         Number.isFinite(item.value) &&
-        item.value > 0 &&
         Number.isFinite(item.chance) &&
         item.chance > 0 &&
-        item.chance <= 1,
+        item.chance <= 1 &&
+        (item.prizeType === "PHYSICAL" || item.value > 0),
     );
 
   if (!name) {
     return NextResponse.json({ success: false, error: "Informe o nome da rifa." }, { status: 400 });
   }
 
-  if (priceTicket <= 0) {
+  if (!Number.isFinite(priceTicket) || priceTicket <= 0) {
     return NextResponse.json({ success: false, error: "Informe um valor de ticket valido." }, { status: 400 });
   }
 
-  if (minTickets < 1 || maxTickets < minTickets) {
+  if (!Number.isFinite(pixValue) || pixValue < 0) {
+    return NextResponse.json({ success: false, error: "Informe um valor PIX valido." }, { status: 400 });
+  }
+
+  if (!Number.isInteger(minTickets) || !Number.isInteger(maxTickets) || minTickets < 1 || maxTickets < minTickets) {
     return NextResponse.json({ success: false, error: "Faixa de tickets invalida." }, { status: 400 });
   }
 
@@ -300,8 +310,8 @@ export async function POST(request: NextRequest) {
         ? {
           create: mysteryPrizes.map((prize) => ({
             name: prize.name,
-            description: prize.description,
-            value: prize.value,
+            description: `${prize.prizeType === "MONETARY" ? MYSTERY_PRIZE_TYPE_MONETARY : MYSTERY_PRIZE_TYPE_PHYSICAL}${prize.description ?? ""}`,
+            value: prize.prizeType === "MONETARY" ? prize.value : 0,
             chance: prize.chance,
             totalAmount: 1,
             remaining: 1,

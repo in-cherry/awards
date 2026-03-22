@@ -1,6 +1,9 @@
 import prisma from "@/lib/database/prisma";
 import { NextResponse } from "next/server";
 
+const MYSTERY_PRIZE_TYPE_MONETARY = "[[TYPE:MONETARY]]";
+const MYSTERY_PRIZE_TYPE_PHYSICAL = "[[TYPE:PHYSICAL]]";
+
 // mystery-box/[raffleId] # API de consumo de dados de um sorteio específico
 export async function GET(request: Request, { params }: { params: Promise<{ raffleId: string }> }) {
   try {
@@ -35,19 +38,30 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
         id: raffle.id,
         mysteryBoxEnabled: raffle.mysteryPrizes.length > 0,
       },
-      prizes: raffle.mysteryPrizes.map((prize) => ({
-        id: prize.id,
-        title: prize.name,
-        description:
-          prize.description ||
-          `Premio instantaneo de ${Number(prize.value).toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL",
-          })}`,
-        chance: Number(prize.chance),
-        remaining: prize.remaining,
-        totalAmount: prize.totalAmount,
-      })),
+      prizes: raffle.mysteryPrizes.map((prize) => {
+        const monetaryValue = Number(prize.value);
+        const rawDescription = prize.description ?? "";
+        const hasMonetaryMarker = rawDescription.startsWith(MYSTERY_PRIZE_TYPE_MONETARY);
+        const hasPhysicalMarker = rawDescription.startsWith(MYSTERY_PRIZE_TYPE_PHYSICAL);
+        const cleanDescription = hasMonetaryMarker
+          ? rawDescription.slice(MYSTERY_PRIZE_TYPE_MONETARY.length).trim()
+          : hasPhysicalMarker
+            ? rawDescription.slice(MYSTERY_PRIZE_TYPE_PHYSICAL.length).trim()
+            : rawDescription.trim();
+
+        const isMonetaryPrize = hasMonetaryMarker && Number.isFinite(monetaryValue) && monetaryValue > 0;
+
+        return {
+          id: prize.id,
+          title: prize.name,
+          description: cleanDescription || null,
+          value: monetaryValue,
+          prizeType: isMonetaryPrize ? "MONETARY" : "PHYSICAL",
+          chance: Number(prize.chance),
+          remaining: prize.remaining,
+          totalAmount: prize.totalAmount,
+        };
+      }),
     });
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

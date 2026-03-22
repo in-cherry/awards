@@ -65,6 +65,9 @@ type RaffleForm = {
 type MysteryPrizeDraft = {
   id: string;
   name: string;
+  type: "MONETARY" | "PHYSICAL";
+  value: string;
+  description: string;
   chance: string;
 };
 
@@ -156,6 +159,12 @@ export default function DashboardRafflesPage() {
     return `${(Math.max(chance, 0) * 100).toFixed(2)}%`;
   }
 
+  function parseDecimalInput(value: string): number {
+    const normalized = String(value ?? "").trim().replace(",", ".");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
     [],
@@ -192,7 +201,8 @@ export default function DashboardRafflesPage() {
 
   const checkoutMinPreview = useMemo(() => {
     const minTickets = Math.max(Number(form.minTickets || 1), 1);
-    const price = Math.max(Number(form.priceTicket || 0), 0);
+    const parsedPrice = parseDecimalInput(form.priceTicket);
+    const price = Number.isFinite(parsedPrice) ? Math.max(parsedPrice, 0) : 0;
     return {
       minTickets,
       total: minTickets * price,
@@ -210,20 +220,26 @@ export default function DashboardRafflesPage() {
     }
 
     const nameValid = form.name.trim().length > 0;
-    const priceTicketValid = Number.isFinite(Number(form.priceTicket)) && Number(form.priceTicket) > 0;
+    const parsedPriceTicket = parseDecimalInput(form.priceTicket);
+    const parsedPixValue = parseDecimalInput(form.pixValue || "0");
+    const priceTicketValid = Number.isFinite(parsedPriceTicket) && parsedPriceTicket > 0;
+    const pixValueValid = Number.isFinite(parsedPixValue) && parsedPixValue >= 0;
     const ticketRangeValid =
       Number.isFinite(Number(form.minTickets)) &&
       Number.isFinite(Number(form.maxTickets)) &&
       Number(form.minTickets) >= 1 &&
       Number(form.maxTickets) >= Number(form.minTickets);
     const invalidMysteryPrizeIds = mysteryPrizes
-      .filter(
-        (prize) =>
-          !prize.name.trim() ||
-          !Number.isFinite(Number(prize.chance)) ||
-          Number(prize.chance) <= 0 ||
-          Number(prize.chance) > 1,
-      )
+      .filter((prize) => {
+        const chanceValue = Number(prize.chance);
+        const valueAmount = parseDecimalInput(prize.value);
+        const hasValidChance = Number.isFinite(chanceValue) && chanceValue > 0 && chanceValue <= 1;
+        const hasValidName = prize.name.trim().length > 0;
+        const hasMonetaryPayload = prize.type === "MONETARY" && Number.isFinite(valueAmount) && valueAmount > 0;
+        const hasPhysicalPayload = prize.type === "PHYSICAL";
+
+        return !hasValidName || !hasValidChance || (!hasMonetaryPayload && !hasPhysicalPayload);
+      })
       .map((prize) => prize.id);
 
     setFormErrors({
@@ -233,7 +249,7 @@ export default function DashboardRafflesPage() {
       mysteryPrizeIds: invalidMysteryPrizeIds,
     });
 
-    if (!nameValid || !priceTicketValid || !ticketRangeValid || invalidMysteryPrizeIds.length > 0) {
+    if (!nameValid || !priceTicketValid || !pixValueValid || !ticketRangeValid || invalidMysteryPrizeIds.length > 0) {
       setFeedback({ kind: "error", text: "Revise os campos destacados antes de criar a rifa." });
       return;
     }
@@ -247,8 +263,8 @@ export default function DashboardRafflesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          pixValue: Number(form.pixValue),
-          priceTicket: Number(form.priceTicket),
+          pixValue: parsedPixValue,
+          priceTicket: parsedPriceTicket,
           minTickets: Number(form.minTickets),
           maxTickets: Number(form.maxTickets),
           collaboratorPrizesEnabled: form.collaboratorPrizesEnabled,
@@ -257,8 +273,10 @@ export default function DashboardRafflesPage() {
           collaboratorPrizeThird: form.collaboratorPrizeThird,
           mysteryPrizes: mysteryPrizes.map((prize) => ({
             name: prize.name.trim(),
-            value: 1,
+            prizeType: prize.type,
+            value: prize.type === "MONETARY" ? parseDecimalInput(prize.value) : 0,
             chance: Number(prize.chance),
+            description: prize.type === "PHYSICAL" ? prize.description.trim() : null,
           })),
         }),
       });
@@ -334,6 +352,9 @@ export default function DashboardRafflesPage() {
       {
         id: crypto.randomUUID(),
         name: "",
+        type: "PHYSICAL",
+        value: "",
+        description: "",
         chance: "0.1",
       },
     ]);
@@ -343,12 +364,12 @@ export default function DashboardRafflesPage() {
     setMysteryPrizes((current) => current.filter((prize) => prize.id !== id));
   }
 
-  function updateMysteryPrize(id: string, field: "name" | "chance", value: string) {
+  function updateMysteryPrize(id: string, field: "name" | "chance" | "type" | "value" | "description", value: string) {
     setMysteryPrizes((current) =>
       current.map((prize) => (prize.id === id ? { ...prize, [field]: value } : prize)),
     );
 
-    if (field === "name" || field === "chance") {
+    if (field === "name" || field === "chance" || field === "type" || field === "value" || field === "description") {
       setFormErrors((prev) => ({
         ...prev,
         mysteryPrizeIds: prev.mysteryPrizeIds.filter((prizeId) => prizeId !== id),
@@ -812,7 +833,7 @@ export default function DashboardRafflesPage() {
                     {mysteryPrizes.map((prize, index) => (
                       <div
                         key={prize.id}
-                        className={`grid grid-cols-1 gap-2 rounded-lg bg-slate-950/50 p-2 md:grid-cols-[1fr_130px_auto] ${formErrors.mysteryPrizeIds.includes(prize.id) ? "border border-rose-400/50" : "border border-white/10"}`}
+                        className={`grid grid-cols-1 gap-2 rounded-lg bg-slate-950/50 p-2 md:grid-cols-[1fr_130px_1fr_130px_auto] ${formErrors.mysteryPrizeIds.includes(prize.id) ? "border border-rose-400/50" : "border border-white/10"}`}
                       >
                         <input
                           value={prize.name}
@@ -820,6 +841,32 @@ export default function DashboardRafflesPage() {
                           placeholder={`Premio ${index + 1}`}
                           className="rounded-md border border-white/15 bg-slate-800/70 px-2 py-1.5 text-xs text-zinc-100"
                         />
+                        <select
+                          value={prize.type}
+                          onChange={(event) => updateMysteryPrize(prize.id, "type", event.target.value)}
+                          className="rounded-md border border-white/15 bg-slate-800/70 px-2 py-1.5 text-xs text-zinc-100"
+                        >
+                          <option value="PHYSICAL">Fisico</option>
+                          <option value="MONETARY">Monetario</option>
+                        </select>
+                        {prize.type === "MONETARY" ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={prize.value}
+                            onChange={(event) => updateMysteryPrize(prize.id, "value", event.target.value)}
+                            placeholder="Valor (R$)"
+                            className="rounded-md border border-white/15 bg-slate-800/70 px-2 py-1.5 text-xs text-zinc-100"
+                          />
+                        ) : (
+                          <input
+                            value={prize.description}
+                            onChange={(event) => updateMysteryPrize(prize.id, "description", event.target.value)}
+                            placeholder="Descricao do premio fisico"
+                            className="rounded-md border border-white/15 bg-slate-800/70 px-2 py-1.5 text-xs text-zinc-100"
+                          />
+                        )}
                         <input
                           type="number"
                           step="0.0001"
