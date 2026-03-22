@@ -24,6 +24,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Não autenticado." }, { status: 401 });
     }
 
+    // Verificar se o usuário tem pelo menos uma organização com assinatura ATIVA
+    const activeSubscription = await prisma.tenant.findFirst({
+      where: {
+        ownerId: authUser.userId,
+        subscription: {
+          status: "ACTIVE"
+        }
+      },
+      select: { id: true }
+    });
+
+    if (!activeSubscription) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Você precisa ter uma assinatura ativa para criar uma nova organização. Escolha um plano e aguarde a ativação pelo administrador."
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const name = String(body?.name ?? "").trim();
     const requestedSlug = String(body?.slug ?? "").trim();

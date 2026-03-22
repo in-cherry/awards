@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { TenantLogoHeader } from "@/components/tenant/tenant-logo-header";
 import { LoginProcessingDialog } from "@/components/tenant/login-processing-dialog";
+import { formatCPFInput, formatPhoneInput, onlyDigits } from "@/lib/utils";
 
 type AuthResponse = {
   success: boolean;
@@ -70,8 +71,8 @@ export function ClientLoginView({ slug, tenant }: ClientLoginViewProps) {
         const endpoint = mode === "register" ? "/api/public/client/register" : "/api/public/client/login";
         const payload =
           mode === "register"
-            ? { slug, name, email, phone, cpf }
-            : { slug, email, cpf };
+            ? { slug, name, email, phone: onlyDigits(phone), cpf: onlyDigits(cpf) }
+            : { slug, email, cpf: onlyDigits(cpf) };
 
         const response = await fetch(endpoint, {
           method: "POST",
@@ -108,7 +109,7 @@ export function ClientLoginView({ slug, tenant }: ClientLoginViewProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="w-full rounded-2xl border border-white/10 bg-slate-900/40 p-6 shadow-xl backdrop-blur-sm md:p-8"
+          className="w-full rounded-2xl border border-slate-500/5 bg-slate-800/40 p-6 shadow-lg backdrop-blur-xl md:p-8"
         >
           <TenantLogoHeader
             href={`/${slug}`}
@@ -123,18 +124,18 @@ export function ClientLoginView({ slug, tenant }: ClientLoginViewProps) {
             </h1>
           </div>
 
-          <div className="mb-4 inline-flex rounded-xl border border-white/10 bg-slate-950/40 p-1">
+          <div className="mb-4 inline-flex rounded-xl border border-slate-500/10 bg-slate-900/55 p-1">
             <button
               type="button"
               onClick={() => setMode("login")}
-              className={`rounded-lg px-3 py-1.5 text-sm ${mode === "login" ? "bg-cyan-600 text-white" : "text-slate-300"}`}
+              className={`rounded-lg px-3 py-1.5 text-sm ${mode === "login" ? "bg-emerald-500 text-[#0B1120]" : "text-slate-300"}`}
             >
               Login
             </button>
             <button
               type="button"
               onClick={() => setMode("register")}
-              className={`rounded-lg px-3 py-1.5 text-sm ${mode === "register" ? "bg-cyan-600 text-white" : "text-slate-300"}`}
+              className={`rounded-lg px-3 py-1.5 text-sm ${mode === "register" ? "bg-emerald-500 text-[#0B1120]" : "text-slate-300"}`}
             >
               Cadastro
             </button>
@@ -163,8 +164,9 @@ export function ClientLoginView({ slug, tenant }: ClientLoginViewProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  placeholder="Telefone"
+                  onChange={(event) => setPhone(formatPhoneInput(event.target.value))}
+                  placeholder="(00) 00000-0000"
+                  maxLength={15}
                   className="rounded-xl border border-white/10 bg-slate-800/70 px-3 py-2 text-sm text-zinc-100"
                 />
               </>
@@ -184,8 +186,9 @@ export function ClientLoginView({ slug, tenant }: ClientLoginViewProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: mode === "register" ? 0.4 : 0.3 }}
               value={cpf}
-              onChange={(event) => setCpf(event.target.value)}
-              placeholder="CPF"
+              onChange={(event) => setCpf(formatCPFInput(event.target.value))}
+              placeholder="000.000.000-00"
+              maxLength={14}
               className="rounded-xl border border-white/10 bg-slate-800/70 px-3 py-2 text-sm text-zinc-100"
             />
 
@@ -214,7 +217,7 @@ export function ClientLoginView({ slug, tenant }: ClientLoginViewProps) {
               transition={{ delay: mode === "register" ? 0.45 : 0.35 }}
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 disabled:opacity-70"
+              className="mt-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#0B1120] transition-colors hover:bg-emerald-400 disabled:opacity-70"
             >
               {isSubmitting ? "Aguarde..." : mode === "register" ? "Criar conta" : "Entrar"}
             </motion.button>
