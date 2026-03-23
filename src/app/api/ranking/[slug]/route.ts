@@ -25,6 +25,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       select: {
         id: true,
         name: true,
+        profile: {
+          select: {
+            nickname: true,
+          },
+        },
         _count: {
           select: { tickets: true }
         }
@@ -83,8 +88,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     }
 
     const formattedRanking = ranking.map((entry, index) => {
+      const nickname = entry.profile?.nickname?.trim();
       const [firstName, lastName] = entry.name.trim().split(/\s+/);
-      const displayName = lastName ? `${firstName} ${lastName}` : firstName;
+      const fallbackName = lastName ? `${firstName} ${lastName}` : firstName;
+      const displayName = nickname && nickname.length > 0 ? nickname : fallbackName;
 
       return {
         position: index + 1,

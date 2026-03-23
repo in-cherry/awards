@@ -192,6 +192,28 @@ export function Raffle() {
     raffle?.collaboratorPrizeThird,
   ]);
 
+  const rankingPrizeByPosition = useMemo(() => {
+    const first = typeof raffle?.collaboratorPrizeFirst === "number" && raffle.collaboratorPrizeFirst > 0
+      ? formatCurrency(raffle.collaboratorPrizeFirst)
+      : "Nao definido";
+    const second = typeof raffle?.collaboratorPrizeSecond === "number" && raffle.collaboratorPrizeSecond > 0
+      ? formatCurrency(raffle.collaboratorPrizeSecond)
+      : "Nao definido";
+    const third = typeof raffle?.collaboratorPrizeThird === "number" && raffle.collaboratorPrizeThird > 0
+      ? formatCurrency(raffle.collaboratorPrizeThird)
+      : "Nao definido";
+
+    return {
+      1: first,
+      2: second,
+      3: third,
+    } as Record<number, string>;
+  }, [
+    raffle?.collaboratorPrizeFirst,
+    raffle?.collaboratorPrizeSecond,
+    raffle?.collaboratorPrizeThird,
+  ]);
+
   if (!raffle) return null;
 
   async function requestPixPayment(forceNewPayment: boolean) {
@@ -467,15 +489,16 @@ export function Raffle() {
             <p className="text-center text-xs text-stone-500 py-4">Nenhum colaborador ainda.</p>
           ) : (
             <div className="overflow-hidden rounded-xl border border-white/5 bg-transparent">
-              <div className="grid grid-cols-[80px_1fr_80px] gap-2 px-4 py-3 bg-transparent border-b border-white/5 border-dashed">
+              <div className="grid grid-cols-[80px_1fr_120px_120px] gap-2 px-4 py-3 bg-transparent border-b border-white/5 border-dashed">
                 <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Colocação</span>
                 <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Nome</span>
-                <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-right">Bilhetes</span>
+                <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Bilhete</span>
+                <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Prêmio</span>
               </div>
               {rankingList.slice(0, 3).map((u, idx) => (
                 <div
                   key={u.position}
-                  className={`grid grid-cols-[80px_1fr_80px] gap-2 items-center px-4 py-3 transition-colors ${idx !== 0 ? 'border-t border-white/5' : ''} bg-transparent`}
+                  className={`grid grid-cols-[80px_1fr_120px_120px] gap-2 items-center px-4 py-3 transition-colors ${idx !== 0 ? 'border-t border-white/5' : ''} bg-transparent`}
                 >
                   <div className="flex items-center justify-center">
                     <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-black ${u.color ?? 'border-white/10 bg-white/5 text-stone-400'
@@ -484,7 +507,10 @@ export function Raffle() {
                     </span>
                   </div>
                   <span className="text-xs font-medium text-stone-300 truncate text-center">{u.name}</span>
-                  <span className="text-xs font-bold text-stone-300 tabular-nums text-right">{u.tickets.toLocaleString('pt-BR')}</span>
+                  <span className="text-[11px] font-bold text-stone-300 tabular-nums text-center">
+                    {u.tickets.toLocaleString('pt-BR')} {u.tickets === 1 ? "bilhete" : "bilhetes"}
+                  </span>
+                  <span className="text-[11px] font-semibold text-stone-300 truncate text-center">{rankingPrizeByPosition[u.position] ?? "Nao definido"}</span>
                 </div>
               ))}
               {user && (
