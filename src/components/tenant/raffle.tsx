@@ -101,23 +101,6 @@ export function Raffle() {
     return 0;
   }
 
-  useEffect(() => {
-    async function fetchRanking() {
-      if (!tenant?.slug) return;
-      try {
-        const res = await fetch(`/api/ranking/${tenant.slug}`);
-        if (res.ok) {
-          const data = (await res.json()) as RankingResponse;
-          setRankingList(data.ranking || []);
-          setUserRankingPosition(data.userPosition ?? null);
-        }
-      } catch (e) {
-        console.error('Failed to fetch ranking', e);
-      }
-    }
-    fetchRanking();
-  }, [tenant?.slug]);
-
   const handleQuantitySelect = (qty: number) => {
     setTicketCount(prev => {
       const newCount = Math.max(raffle?.minNumbers ?? 1, prev + qty);
@@ -192,6 +175,41 @@ export function Raffle() {
     raffle?.collaboratorPrizeThird,
   ]);
 
+  const showCollaboratorRanking = useMemo(() => {
+    const hasAnyCollaboratorPrize =
+      (typeof raffle?.collaboratorPrizeFirst === "number" && raffle.collaboratorPrizeFirst > 0) ||
+      (typeof raffle?.collaboratorPrizeSecond === "number" && raffle.collaboratorPrizeSecond > 0) ||
+      (typeof raffle?.collaboratorPrizeThird === "number" && raffle.collaboratorPrizeThird > 0);
+
+    return Boolean(raffle?.collaboratorPrizesEnabled && hasAnyCollaboratorPrize);
+  }, [
+    raffle?.collaboratorPrizesEnabled,
+    raffle?.collaboratorPrizeFirst,
+    raffle?.collaboratorPrizeSecond,
+    raffle?.collaboratorPrizeThird,
+  ]);
+
+  useEffect(() => {
+    async function fetchRanking() {
+      if (!tenant?.slug || !showCollaboratorRanking) {
+        setRankingList([]);
+        setUserRankingPosition(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/ranking/${tenant.slug}`);
+        if (res.ok) {
+          const data = (await res.json()) as RankingResponse;
+          setRankingList(data.ranking || []);
+          setUserRankingPosition(data.userPosition ?? null);
+        }
+      } catch (e) {
+        console.error('Failed to fetch ranking', e);
+      }
+    }
+    fetchRanking();
+  }, [tenant?.slug, showCollaboratorRanking]);
+
   const rankingPrizeByPosition = useMemo(() => {
     const first = typeof raffle?.collaboratorPrizeFirst === "number" && raffle.collaboratorPrizeFirst > 0
       ? formatCurrency(raffle.collaboratorPrizeFirst)
@@ -213,6 +231,13 @@ export function Raffle() {
     raffle?.collaboratorPrizeSecond,
     raffle?.collaboratorPrizeThird,
   ]);
+
+  const hasAvailableMysteryPrizes = useMemo(
+    () => prizes.some((prize) => prize.remaining > 0),
+    [prizes],
+  );
+
+  const hasConfiguredMysteryPrizes = prizes.length > 0;
 
   if (!raffle) return null;
 
@@ -447,7 +472,8 @@ export function Raffle() {
       </div>
 
       {/* Ranking */}
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
+      {showCollaboratorRanking ? (
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
         <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
           <div className="flex items-center">
             <Users size={16} className="mr-2 text-emerald-400" />
@@ -528,10 +554,12 @@ export function Raffle() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      ) : null}
 
       {/* Caixa Misteriosa */}
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
+      {hasConfiguredMysteryPrizes && hasAvailableMysteryPrizes ? (
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
         <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
           <div className="flex items-center">
             <ShoppingBag size={16} className="mr-2 text-emerald-400" />
@@ -556,10 +584,12 @@ export function Raffle() {
             </div>
           ))}
         </div>
-      </div>
+        </div>
+      ) : null}
 
       {/* Premio da Caixa Misteriosa */}
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
+      {hasConfiguredMysteryPrizes ? (
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
         <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
           <div className="flex items-center">
             <Gift size={16} className="mr-2 text-emerald-400" />
@@ -582,14 +612,14 @@ export function Raffle() {
                 <div
                   key={prize.id}
                   className={`flex items-center justify-between gap-3 rounded-lg border p-3 transition-all ${isAvailable
-                      ? "border-emerald-400/30 bg-gradient-to-r from-emerald-500/5 to-slate-900/20 hover:border-emerald-400/50"
-                      : "border-slate-500/20 bg-slate-900/30 opacity-60"
+                    ? "border-emerald-400/30 bg-gradient-to-r from-emerald-500/5 to-slate-900/20 hover:border-emerald-400/50"
+                    : "border-slate-500/20 bg-slate-900/30 opacity-60"
                     }`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={`flex h-10 w-10 items-center justify-center rounded-lg border flex-shrink-0 ${isAvailable
-                        ? "bg-emerald-500/15 border-emerald-400/30"
-                        : "bg-slate-700/20 border-slate-500/20"
+                      ? "bg-emerald-500/15 border-emerald-400/30"
+                      : "bg-slate-700/20 border-slate-500/20"
                       }`}>
                       {isAvailable ? (
                         <Gift size={18} className="text-emerald-300" />
@@ -616,7 +646,8 @@ export function Raffle() {
             })}
           </div>
         )}
-      </div>
+        </div>
+      ) : null}
 
       {/* Bilheteria */}
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
@@ -675,14 +706,16 @@ export function Raffle() {
             <span className="text-xs uppercase font-mono text-zinc-500">Total a pagar</span>
             <span className="text-lg font-bold text-white">{formatCurrency((Number(raffle.price) || 0) * ticketCount)}</span>
           </div>
-          <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-slate-800/40 px-3 py-2 sm:px-4">
-            <div className="rounded-xl">
-              <Gift size={16} className="text-zinc-500" />
+          {hasAvailableMysteryPrizes ? (
+            <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-slate-800/40 px-3 py-2 sm:px-4">
+              <div className="rounded-xl">
+                <Gift size={16} className="text-zinc-500" />
+              </div>
+              <span className="text-xs font-mono uppercase text-zinc-500">
+                Você ganha<br />{getUnlockedBoxesByTickets(ticketCount)} caixa{getUnlockedBoxesByTickets(ticketCount) !== 1 ? "s" : ""}
+              </span>
             </div>
-            <span className="text-xs font-mono uppercase text-zinc-500">
-              Você ganha<br />{getUnlockedBoxesByTickets(ticketCount)} caixa{getUnlockedBoxesByTickets(ticketCount) !== 1 ? "s" : ""}
-            </span>
-          </div>
+          ) : null}
         </div>
 
         <motion.button

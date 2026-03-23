@@ -163,7 +163,32 @@ export async function GET(request: NextRequest) {
       raffleMap.set(key, current);
     }
 
+    const raffleIds = Array.from(raffleMap.keys());
+    const raffleMysteryPrizeCounts = raffleIds.length
+      ? await prisma.mysteryPrize.groupBy({
+        by: ["raffleId"],
+        where: {
+          raffleId: {
+            in: raffleIds,
+          },
+        },
+        _count: {
+          raffleId: true,
+        },
+      })
+      : [];
+
+    const raffleIdsWithMysteryPrizes = new Set(
+      raffleMysteryPrizeCounts
+        .filter((entry) => entry._count.raffleId > 0)
+        .map((entry) => entry.raffleId),
+    );
+
     const boxCards = Array.from(raffleMap.values()).flatMap((raffleSummary) => {
+      if (!raffleIdsWithMysteryPrizes.has(raffleSummary.id)) {
+        return [];
+      }
+
       const unlockedBoxes = getUnlockedBoxes(raffleSummary.completedTicketsCount);
       if (unlockedBoxes <= 0) return [];
 

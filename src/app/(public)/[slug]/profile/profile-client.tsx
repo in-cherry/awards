@@ -775,10 +775,10 @@ export function ClientProfileView({ slug, tenant }: ClientProfileViewProps) {
                       <div
                         key={ticket.id}
                         className={`flex items-center justify-center rounded-lg border p-2 text-center text-sm font-semibold transition-all ${isHighlighted
-                            ? "border-amber-300/60 bg-amber-400/20 text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.25)]"
-                            : isFinished
-                              ? "border-slate-500/20 bg-slate-900/30 text-slate-500"
-                              : "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+                          ? "border-amber-300/60 bg-amber-400/20 text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.25)]"
+                          : isFinished
+                            ? "border-slate-500/20 bg-slate-900/30 text-slate-500"
+                            : "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
                           }`}
                       >
                         {ticket.number}
