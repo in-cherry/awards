@@ -194,19 +194,19 @@ export async function GET(request: NextRequest) {
         return [];
       }
 
-      // Calcular caixas ganhas somando cada pagamento individual nesta rifa
-      const paymentsForRaffle = client.payments.filter((payment) => {
-        const hasTicketInRaffle = client.tickets.some(
-          (ticket) =>
-            ticket.raffleId === raffleSummary.id &&
-            ticket.payment?.id === payment.id &&
-            ticket.payment?.status === "COMPLETED",
-        );
-        return hasTicketInRaffle;
-      });
+      // Alinha com a rota de abertura: caixas por quantidade de tickets daquela rifa em cada payment COMPLETED.
+      const completedTicketCountByPayment = new Map<string, number>();
 
-      const unlockedBoxes = paymentsForRaffle.reduce((total, payment) => {
-        return total + getBoxesFromTickets(payment.amount);
+      for (const ticket of client.tickets) {
+        if (ticket.raffleId !== raffleSummary.id) continue;
+        if (!ticket.payment || ticket.payment.status !== "COMPLETED") continue;
+
+        const current = completedTicketCountByPayment.get(ticket.payment.id) ?? 0;
+        completedTicketCountByPayment.set(ticket.payment.id, current + 1);
+      }
+
+      const unlockedBoxes = Array.from(completedTicketCountByPayment.values()).reduce((total, ticketCountInPayment) => {
+        return total + getBoxesFromTickets(ticketCountInPayment);
       }, 0);
 
       if (unlockedBoxes <= 0) return [];

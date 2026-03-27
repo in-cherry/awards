@@ -2,6 +2,7 @@ import { AwardClaimType, AwardType, Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/database/prisma";
 import { getClientAuthUser } from "@/lib/auth/mddleware";
+import { MYSTERY_BOX_CHANCE_BASE, MYSTERY_BOX_EMPTY_PRIZE } from "@/lib/constants/mystery-box";
 
 type PrizeCandidate = {
   id: string;
@@ -22,38 +23,45 @@ function getBoxesFromTickets(ticketCount: number): number {
   return 0;
 }
 
-function pickWeightedPrize(prizes: PrizeCandidate[]): PrizeCandidate | null {
-  if (prizes.length === 0) return null;
+function getPrizeChance(chance: number): number {
+  return Math.min(Math.max(Number(chance) || 0, 0), MYSTERY_BOX_CHANCE_BASE);
+}
 
-  // Fallback de 0.0010% quando chance for 0
-  const FALLBACK_CHANCE = 0.000001;
+function calculateEmptyBoxChance(prizes: PrizeCandidate[]): number {
+  const prizesChanceTotal = prizes.reduce((sum, prize) => sum + getPrizeChance(prize.chance), 0);
+  return Math.max(MYSTERY_BOX_CHANCE_BASE - prizesChanceTotal, 0);
+}
 
-  const prizeWeights = prizes.map(prize => ({
-    ...prize,
-    weight: Math.max(Number(prize.chance) || 0, FALLBACK_CHANCE),
-  }));
-
-  const totalChance = prizeWeights.reduce((sum, prize) => sum + prize.weight, 0);
-
-  // Se todas as chances são 0, seleciona aleatoriamente de forma uniforme
-  if (totalChance <= 0) {
-    const randomIndex = Math.floor(Math.random() * prizes.length);
-    return prizes[randomIndex] ?? null;
+function pickWeightedPrize(prizes: PrizeCandidate[]): { selectedPrize: PrizeCandidate | null; emptyChance: number } {
+  if (prizes.length === 0) {
+    return { selectedPrize: null, emptyChance: MYSTERY_BOX_CHANCE_BASE };
   }
 
-  // Sorteio ponderado: gera número aleatório entre 0 e totalChance
-  const target = Math.random() * totalChance;
+  const prizesChanceTotal = prizes.reduce((sum, prize) => sum + getPrizeChance(prize.chance), 0);
+  const emptyChance = calculateEmptyBoxChance(prizes);
+  const poolTotal = prizesChanceTotal + emptyChance;
+
+  if (poolTotal <= 0) {
+    return { selectedPrize: null, emptyChance: 0 };
+  }
+
+  const target = Math.random() * poolTotal;
+
+  if (target <= emptyChance) {
+    return { selectedPrize: null, emptyChance };
+  }
+
+  const adjustedTarget = target - emptyChance;
   let cumulative = 0;
 
-  for (const prize of prizeWeights) {
-    cumulative += prize.weight;
-    if (target <= cumulative) {
-      return prizes.find(p => p.id === prize.id) ?? null;
+  for (const prize of prizes) {
+    cumulative += getPrizeChance(prize.chance);
+    if (adjustedTarget <= cumulative) {
+      return { selectedPrize: prize, emptyChance };
     }
   }
 
-  // Fallback para o último prêmio (edge case)
-  return prizes[prizes.length - 1] ?? null;
+  return { selectedPrize: prizes[prizes.length - 1] ?? null, emptyChance };
 }
 
 function jsonNoStore(body: unknown, status = 200) {
@@ -257,46 +265,40 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
           };
         }
 
-        const selectedPrize = pickWeightedPrize(availablePrizes);
-        if (!selectedPrize) {
-          return {
-            kind: "blocked" as const,
-            status: 500,
-            error: "Falha ao sortear premio.",
-            unlockedBoxes,
-            openedBoxes,
-            completedTickets: completedPayments.reduce((sum, p) => sum + p.tickets.length, 0),
-          };
+        const pickResult = pickWeightedPrize(availablePrizes);
+        const selectedPrize = pickResult.selectedPrize;
+        if (selectedPrize) {
+          const decrease = await tx.mysteryPrize.updateMany({
+            where: {
+              id: selectedPrize.id,
+              raffleId: raffle.id,
+              remaining: {
+                gt: 0,
+              },
+            },
+            data: {
+              remaining: {
+                decrement: 1,
+              },
+            },
+          });
+
+          if (decrease.count === 0) {
+            return { kind: "retry" as const };
+          }
         }
 
-        const decrease = await tx.mysteryPrize.updateMany({
-          where: {
-            id: selectedPrize.id,
-            raffleId: raffle.id,
-            remaining: {
-              gt: 0,
-            },
-          },
-          data: {
-            remaining: {
-              decrement: 1,
-            },
-          },
-        });
-
-        if (decrease.count === 0) {
-          return { kind: "retry" as const };
-        }
+        const resolvedPrize = selectedPrize ?? MYSTERY_BOX_EMPTY_PRIZE;
 
         const award = await tx.award.create({
           data: {
             tenantId: raffle.tenantId,
             clientId: client.id,
             raffleId: raffle.id,
-            name: selectedPrize.name,
+            name: resolvedPrize.name,
             type: "INSTANT_PRIZE",
             claimedType: "PRODUCT",
-            awardedValue: selectedPrize.value,
+            awardedValue: resolvedPrize.value,
           },
           select: {
             id: true,
@@ -314,11 +316,11 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
           openedBoxes: openedBoxes + 1,
           completedTickets: completedPayments.reduce((sum, p) => sum + p.tickets.length, 0),
           prize: {
-            id: selectedPrize.id,
-            name: selectedPrize.name,
-            value: selectedPrize.value,
-            chance: selectedPrize.chance,
-            remaining: Math.max(selectedPrize.remaining - 1, 0),
+            id: resolvedPrize.id,
+            name: resolvedPrize.name,
+            value: resolvedPrize.value,
+            chance: selectedPrize?.chance ?? pickResult.emptyChance,
+            remaining: selectedPrize ? Math.max(selectedPrize.remaining - 1, 0) : resolvedPrize.remaining,
           },
           award: {
             id: award.id,
