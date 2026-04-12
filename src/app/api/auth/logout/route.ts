@@ -1,8 +1,8 @@
 import { getActiveTenantCookieName, getCookieName } from "@/lib/auth/jwt";
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/server/http";
 
 export async function POST() {
-  const response = NextResponse.json({ success: true, message: "Logout realizado com sucesso" }, { status: 200 });
+  const response = jsonNoStore({ success: true, message: "Logout realizado com sucesso" }, 200);
 
   response.cookies.set({
     name: getCookieName(),

@@ -9,7 +9,10 @@ export async function getAuthUser(): Promise<JWTPayload | null> {
 
     if (!token) return null;
 
-    return await verifyToken(token);
+    const payload = await verifyToken(token);
+    if (!payload || payload.type !== "user") return null;
+
+    return payload;
   } catch {
     return null;
   }

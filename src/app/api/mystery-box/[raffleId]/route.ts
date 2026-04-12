@@ -1,5 +1,5 @@
 import prisma from "@/lib/database/prisma";
-import { NextResponse } from "next/server";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
 
 const MYSTERY_PRIZE_TYPE_MONETARY = "[[TYPE:MONETARY]]";
 const MYSTERY_PRIZE_TYPE_PHYSICAL = "[[TYPE:PHYSICAL]]";
@@ -29,10 +29,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
     });
 
     if (!raffle) {
-      return NextResponse.json({ error: "Raffle not found" }, { status: 404 });
+      return jsonError("Raffle not found", 404);
     }
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       raffle: {
         id: raffle.id,
@@ -64,6 +64,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ raff
       }),
     });
   } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError("Internal server error", 500);
   }
 }
