@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/database/prisma";
 import { getClientAuthUser } from "@/lib/auth/mddleware";
+import {
+  MYSTERY_BOX_LEGACY_LOCK_DISPLAY_NAME,
+  MYSTERY_BOX_LEGACY_LOCK_NAME,
+} from "@/lib/constants/mystery-box";
 
 /**
  * Calcula caixas ganhas para uma quantidade específica de bilhetes.
@@ -11,6 +15,14 @@ function getBoxesFromTickets(ticketCount: number): number {
   if (ticketCount >= 600) return 2;
   if (ticketCount >= 400) return 1;
   return 0;
+}
+
+function normalizeBoxPrizeTitle(title: string | null | undefined): string | null {
+  if (!title) return null;
+  if (title === MYSTERY_BOX_LEGACY_LOCK_NAME) {
+    return MYSTERY_BOX_LEGACY_LOCK_DISPLAY_NAME;
+  }
+  return title;
 }
 
 export async function GET(request: NextRequest) {
@@ -194,19 +206,20 @@ export async function GET(request: NextRequest) {
         return [];
       }
 
-      // Alinha com a rota de abertura: caixas por quantidade de tickets daquela rifa em cada payment COMPLETED.
-      const completedTicketCountByPayment = new Map<string, number>();
+      // Alinha com a rota de abertura: caixas por payment.amount de cada compra COMPLETED.
+      const completedPaymentAmountByPayment = new Map<string, number>();
 
       for (const ticket of client.tickets) {
         if (ticket.raffleId !== raffleSummary.id) continue;
         if (!ticket.payment || ticket.payment.status !== "COMPLETED") continue;
 
-        const current = completedTicketCountByPayment.get(ticket.payment.id) ?? 0;
-        completedTicketCountByPayment.set(ticket.payment.id, current + 1);
+        if (!completedPaymentAmountByPayment.has(ticket.payment.id)) {
+          completedPaymentAmountByPayment.set(ticket.payment.id, ticket.payment.amount);
+        }
       }
 
-      const unlockedBoxes = Array.from(completedTicketCountByPayment.values()).reduce((total, ticketCountInPayment) => {
-        return total + getBoxesFromTickets(ticketCountInPayment);
+      const unlockedBoxes = Array.from(completedPaymentAmountByPayment.values()).reduce((total, amountInPayment) => {
+        return total + getBoxesFromTickets(amountInPayment);
       }, 0);
 
       if (unlockedBoxes <= 0) return [];
@@ -226,7 +239,7 @@ export async function GET(request: NextRequest) {
           raffleImage: raffleSummary.image,
           boxNumber: index + 1,
           status: isOpened ? "OPENED" : "AVAILABLE",
-          prizeTitle: openedAward?.name ?? null,
+          prizeTitle: normalizeBoxPrizeTitle(openedAward?.name),
           openedAt: openedAward?.createdAt.toISOString() ?? null,
         };
       });

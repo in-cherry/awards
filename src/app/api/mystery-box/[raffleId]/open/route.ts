@@ -182,23 +182,23 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
             tenantId: raffle.tenantId,
             clientId: client.id,
             status: "COMPLETED",
+            tickets: {
+              some: {
+                raffleId: raffle.id,
+              },
+            },
           },
           select: {
             amount: true,
-            tickets: {
-              where: {
-                raffleId: raffle.id,
-              },
-              select: { id: true },
-            },
           },
         });
 
-        // Somar caixas de cada payment individual baseado nos bilhetes daquela rifa
+        // Somar caixas por payment.amount (quantidade comprada naquela transacao).
         const unlockedBoxes = completedPayments.reduce((total, payment) => {
-          const raffleTicketsFromPayment = payment.tickets.length;
-          return total + getBoxesFromTickets(raffleTicketsFromPayment);
+          return total + getBoxesFromTickets(payment.amount);
         }, 0);
+
+        const completedTickets = completedPayments.reduce((sum, payment) => sum + payment.amount, 0);
         const openedBoxes = await tx.award.count({
           where: {
             tenantId: raffle.tenantId,
@@ -215,7 +215,7 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
             error: "Voce ainda nao desbloqueou caixas misteriosas nesta rifa.",
             unlockedBoxes,
             openedBoxes,
-            completedTickets: completedPayments.reduce((sum, p) => sum + p.tickets.length, 0),
+            completedTickets,
           };
         }
 
@@ -226,7 +226,7 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
             error: "Todas as caixas disponiveis para esta faixa de tickets ja foram abertas.",
             unlockedBoxes,
             openedBoxes,
-            completedTickets: completedPayments.reduce((sum, p) => sum + p.tickets.length, 0),
+            completedTickets,
           };
         }
 
@@ -261,7 +261,7 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
             error: "Nao ha premios instantaneos disponiveis no momento.",
             unlockedBoxes,
             openedBoxes,
-            completedTickets: completedPayments.reduce((sum, p) => sum + p.tickets.length, 0),
+            completedTickets,
           };
         }
 
@@ -314,7 +314,7 @@ async function openBoxSecure(args: { raffleId: string; tenantId: string; clientI
           kind: "success" as const,
           unlockedBoxes,
           openedBoxes: openedBoxes + 1,
-          completedTickets: completedPayments.reduce((sum, p) => sum + p.tickets.length, 0),
+          completedTickets,
           prize: {
             id: resolvedPrize.id,
             name: resolvedPrize.name,
