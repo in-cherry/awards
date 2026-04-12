@@ -1,26 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/database/prisma";
 import { generateToken, getClientCookieName } from "@/lib/auth/jwt";
-
-function onlyDigits(value: string): string {
-  return value.replace(/\D/g, "");
-}
+import { jsonError, jsonNoStore } from "@/lib/server/http";
+import { checkRateLimit, getRequestIp } from "@/lib/server/rate-limit";
+import { publicClientRegisterSchema } from "@/lib/validation/auth";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const slug = String(body?.slug || "").trim().toLowerCase();
-    const name = String(body?.name || "").trim();
-    const email = String(body?.email || "").trim().toLowerCase();
-    const phone = String(body?.phone || "").trim();
-    const cpf = onlyDigits(String(body?.cpf || ""));
+    const { slug, name, email, phone, cpf } = publicClientRegisterSchema.parse(await request.json());
+    const ip = getRequestIp(request);
+    const rateLimit = checkRateLimit({
+      key: `public:client:register:${ip}:${slug}:${email}`,
+      limit: 5,
+      windowMs: 60_000,
+    });
 
-    if (!slug || !name || !email || !phone || !cpf) {
-      return NextResponse.json({ success: false, error: "Nome, email, telefone, CPF e slug sao obrigatorios." }, { status: 400 });
-    }
-
-    if (cpf.length !== 11) {
-      return NextResponse.json({ success: false, error: "CPF invalido." }, { status: 400 });
+    if (!rateLimit.allowed) {
+      return jsonError("Muitas tentativas. Tente novamente em instantes.", 429, {
+        retryAfter: rateLimit.retryAfterSeconds,
+      });
     }
 
     const tenant = await prisma.tenant.findUnique({
@@ -33,7 +32,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!tenant) {
-      return NextResponse.json({ success: false, error: "Organizacao nao encontrada." }, { status: 404 });
+      return jsonError("Organizacao nao encontrada.", 404);
     }
 
     const existingByEmail = await prisma.client.findFirst({
@@ -53,11 +52,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingByEmail && existingByEmail.cpf !== cpf) {
-      return NextResponse.json({ success: false, error: "Este email ja esta vinculado a outro CPF." }, { status: 409 });
+      return jsonError("Este email ja esta vinculado a outro CPF.", 409);
     }
 
     if (existingByCpf && existingByCpf.email !== email) {
-      return NextResponse.json({ success: false, error: "Este CPF ja esta vinculado a outro email." }, { status: 409 });
+      return jsonError("Este CPF ja esta vinculado a outro email.", 409);
     }
 
     const client = existingByEmail || existingByCpf
@@ -89,7 +88,7 @@ export async function POST(request: NextRequest) {
       tenantId: tenant.id,
     });
 
-    const response = NextResponse.json({
+    const response = jsonNoStore({
       success: true,
       client: {
         id: client.id,
@@ -114,7 +113,13 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Erro no registro de cliente:", error);
-    return NextResponse.json({ success: false, error: "Erro interno do servidor." }, { status: 500 });
+    if (error instanceof ZodError) {
+      return jsonError("Payload invalido.", 400, {
+        issues: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      });
+    }
+
+    console.error("Erro no registro de cliente:", error instanceof Error ? error.message : "erro desconhecido");
+    return jsonError("Erro interno do servidor.", 500);
   }
 }
