@@ -1,36 +1,54 @@
-import { NextRequest, NextResponse } from "next/server";
+import { TenantRole } from "@prisma/client";
+import { ZodError } from "zod";
+import { NextRequest } from "next/server";
+import { getAuthUser } from "@/lib/auth/mddleware";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
+import { getActiveTenantAccess, hasTenantRole } from "@/lib/server/tenant-access";
+import { mercadopagoSyncSchema } from "@/lib/validation/mercadopago-sync";
 
-function getBaseUrl(request: NextRequest): string {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (envUrl) return envUrl.replace(/\/$/, "");
-
-  const host = request.headers.get("host") || "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  return `${protocol}://${host}`;
+function getInternalBaseUrl(): string | null {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!envUrl) return null;
+  return envUrl.replace(/\/$/, "");
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const externalId = String(body?.externalId || "").trim();
+    const authUser = await getAuthUser();
+    if (!authUser) return jsonError("Nao autenticado.", 401);
 
-    if (!externalId) {
-      return NextResponse.json({ success: false, error: "externalId e obrigatorio." }, { status: 400 });
+    const access = await getActiveTenantAccess(authUser.userId);
+    if (!access) return jsonError("Organizacao ativa nao encontrada.", 404);
+
+    if (!hasTenantRole(access, [TenantRole.OWNER, TenantRole.ADMIN])) {
+      return jsonError("Sem permissao para sincronizar pagamentos.", 403);
     }
 
-    // Encaminha para o webhook interno para reutilizar a mesma lógica de processamento.
-    const baseUrl = getBaseUrl(request);
-    const url = new URL(`/api/payments/mercadopago/webhook?id=${encodeURIComponent(externalId)}`, baseUrl);
+    const { externalId } = mercadopagoSyncSchema.parse(await request.json());
+    const normalizedExternalId = String(externalId).trim();
+
+    const baseUrl = getInternalBaseUrl();
+    if (!baseUrl) {
+      return jsonError("NEXT_PUBLIC_APP_URL nao configurada para sincronizacao manual.", 500);
+    }
+
+    const url = new URL(`/api/payments/mercadopago/webhook?id=${encodeURIComponent(normalizedExternalId)}`, baseUrl);
     const webhookResponse = await fetch(url, { method: "GET" });
-    const data = await webhookResponse.json();
+    const data = await webhookResponse.json().catch(() => ({}));
 
     if (!webhookResponse.ok) {
-      return NextResponse.json({ success: false, error: data?.error || "Falha ao sincronizar pagamento." }, { status: 500 });
+      return jsonError(data?.error || "Falha ao sincronizar pagamento.", 500);
     }
 
-    return NextResponse.json({ success: true, result: data?.result || null });
+    return jsonNoStore({ success: true, result: data?.result || null });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return jsonError("Payload invalido.", 400, {
+        issues: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      });
+    }
+
     console.error("Erro ao sincronizar pagamento manualmente:", error);
-    return NextResponse.json({ success: false, error: "Erro interno do servidor." }, { status: 500 });
+    return jsonError("Erro interno do servidor.", 500);
   }
 }

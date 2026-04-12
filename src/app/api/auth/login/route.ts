@@ -1,14 +1,28 @@
 import bcrypt from "bcrypt";
 import prisma from "@/lib/database/prisma";
-import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { NextRequest } from "next/server";
 import { generateToken, getCookieName } from "@/lib/auth/jwt";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
+import { checkRateLimit, getRequestIp } from "@/lib/server/rate-limit";
+import { authLoginSchema } from "@/lib/validation/auth";
+
+const DUMMY_HASH = "$2b$10$CwTycUXWue0Thq9StjUM0uJ8kD0fG8JrIoYNewc19hXtOD87Qy4Fu";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password } = authLoginSchema.parse(await request.json());
+    const ip = getRequestIp(request);
+    const rateLimit = checkRateLimit({
+      key: `auth:login:${ip}:${email}`,
+      limit: 8,
+      windowMs: 60_000,
+    });
 
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: "Email e senha são obrigatórios" }), { status: 400 });
+    if (!rateLimit.allowed) {
+      return jsonError("Muitas tentativas. Tente novamente em instantes.", 429, {
+        retryAfter: rateLimit.retryAfterSeconds,
+      });
     }
 
     const user = await prisma.user.findUnique({
@@ -21,19 +35,16 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    if (!user) {
-      return NextResponse.json({ error: "Email ou senha inválidos" }, { status: 404 });
-    }
+    const passwordHash = user?.password || DUMMY_HASH;
+    const validPassword = await bcrypt.compare(password, passwordHash);
 
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return NextResponse.json({ error: "Email ou senha inválidos" }, { status: 404 });
+    if (!user || !validPassword) {
+      return jsonError("Email ou senha invalidos", 404);
     }
 
     const token = await generateToken({ userId: user.id, email: user.email, type: "user" });
     const tenants = [...user.ownedTenants, ...user.memberTenants.map(m => m.tenant)];
-    const response = NextResponse.json(
+    const response = jsonNoStore(
       {
         success: true,
         user: {
@@ -58,10 +69,13 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Erro no login:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
+    if (error instanceof ZodError) {
+      return jsonError("Payload invalido.", 400, {
+        issues: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      });
+    }
+
+    console.error("Erro no login:", error instanceof Error ? error.message : "erro desconhecido");
+    return jsonError("Erro interno do servidor", 500);
   }
 }

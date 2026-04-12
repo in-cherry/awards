@@ -1,32 +1,40 @@
 import prisma from "@/lib/database/prisma";
+import { ZodError } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { sendVerificationEmail } from "@/lib/auth/email";
 import { generateToken, getCookieName } from "@/lib/auth/jwt";
 import { Prisma } from "@prisma/client";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
+import { checkRateLimit, getRequestIp } from "@/lib/server/rate-limit";
+import { authRegisterSchema } from "@/lib/validation/auth";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, phone, cpf } = await request.json();
+    const { email, password, name, phone, cpf } = authRegisterSchema.parse(await request.json());
+    const ip = getRequestIp(request);
+    const rateLimit = checkRateLimit({
+      key: `auth:register:${ip}:${email}`,
+      limit: 5,
+      windowMs: 60_000,
+    });
 
-    if (!email || !password || !name || !phone || !cpf) {
-      return new Response(JSON.stringify({ error: "Todos os campos são obrigatórios" }), { status: 400 });
-    }
-
-    if (password.length < 6) {
-      return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 6 caracteres" }), { status: 400 });
+    if (!rateLimit.allowed) {
+      return jsonError("Muitas tentativas. Tente novamente em instantes.", 429, {
+        retryAfter: rateLimit.retryAfterSeconds,
+      });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
 
     if (existingUser) {
-      return new Response(JSON.stringify({ error: "Email já registrado" }), { status: 400 });
+      return jsonError("Email ja registrado", 400);
     }
 
     const existingCpf = await prisma.user.findUnique({ where: { cpf } });
 
     if (existingCpf) {
-      return new Response(JSON.stringify({ error: "CPF já registrado" }), { status: 400 });
+      return jsonError("CPF ja registrado", 400);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -50,7 +58,7 @@ export async function POST(request: NextRequest) {
     });
 
     const token = await generateToken({ userId: user.id, email: user.email, type: "user" });
-    const response = NextResponse.json(
+    const response = jsonNoStore(
       {
         success: true,
         user: {
@@ -74,34 +82,28 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Erro no registro:", error);
+    if (error instanceof ZodError) {
+      return jsonError("Payload invalido.", 400, {
+        issues: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      });
+    }
+
+    console.error("Erro no registro:", error instanceof Error ? error.message : "erro desconhecido");
 
     // Handle Prisma unique constraint violations
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const field = (error.meta?.target as string[])?.[0] || 'campo';
         if (field === 'email') {
-          return NextResponse.json(
-            { error: "Email já registrado" },
-            { status: 400 }
-          );
+          return jsonError("Email ja registrado", 400);
         } else if (field === 'cpf') {
-          return NextResponse.json(
-            { error: "CPF já registrado" },
-            { status: 400 }
-          );
+          return jsonError("CPF ja registrado", 400);
         } else if (field === 'phone') {
-          return NextResponse.json(
-            { error: "Número de telefone já registrado" },
-            { status: 400 }
-          );
+          return jsonError("Numero de telefone ja registrado", 400);
         }
       }
     }
 
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
+    return jsonError("Erro interno do servidor", 500);
   }
 }

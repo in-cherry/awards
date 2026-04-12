@@ -1,20 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/database/prisma";
 import { generateToken, getClientCookieName } from "@/lib/auth/jwt";
-
-function onlyDigits(value: string): string {
-  return value.replace(/\D/g, "");
-}
+import { jsonError, jsonNoStore } from "@/lib/server/http";
+import { checkRateLimit, getRequestIp } from "@/lib/server/rate-limit";
+import { publicClientLoginSchema } from "@/lib/validation/auth";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const slug = String(body?.slug || "").trim().toLowerCase();
-    const email = String(body?.email || "").trim().toLowerCase();
-    const cpf = onlyDigits(String(body?.cpf || ""));
+    const { slug, email, cpf } = publicClientLoginSchema.parse(await request.json());
+    const ip = getRequestIp(request);
+    const rateLimit = checkRateLimit({
+      key: `public:client:login:${ip}:${slug}:${email}`,
+      limit: 8,
+      windowMs: 60_000,
+    });
 
-    if (!slug || !email || !cpf) {
-      return NextResponse.json({ success: false, error: "Slug, email e CPF sao obrigatorios." }, { status: 400 });
+    if (!rateLimit.allowed) {
+      return jsonError("Muitas tentativas. Tente novamente em instantes.", 429, {
+        retryAfter: rateLimit.retryAfterSeconds,
+      });
     }
 
     const tenant = await prisma.tenant.findUnique({
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!tenant) {
-      return NextResponse.json({ success: false, error: "Organizacao nao encontrada." }, { status: 404 });
+      return jsonError("Organizacao nao encontrada.", 404);
     }
 
     const client = await prisma.client.findFirst({
@@ -38,7 +43,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!client) {
-      return NextResponse.json({ success: false, error: "Cliente nao encontrado para este email/CPF." }, { status: 404 });
+      return jsonError("Cliente nao encontrado para este email/CPF.", 404);
     }
 
     const token = await generateToken({
@@ -48,7 +53,7 @@ export async function POST(request: NextRequest) {
       tenantId: tenant.id,
     });
 
-    const response = NextResponse.json({
+    const response = jsonNoStore({
       success: true,
       client: {
         id: client.id,
@@ -73,7 +78,13 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Erro no login de cliente:", error);
-    return NextResponse.json({ success: false, error: "Erro interno do servidor." }, { status: 500 });
+    if (error instanceof ZodError) {
+      return jsonError("Payload invalido.", 400, {
+        issues: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      });
+    }
+
+    console.error("Erro no login de cliente:", error instanceof Error ? error.message : "erro desconhecido");
+    return jsonError("Erro interno do servidor.", 500);
   }
 }

@@ -1,30 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { TenantRole } from "@prisma/client";
+import { ZodError } from "zod";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/database/prisma";
 import { getAuthUser } from "@/lib/auth/mddleware";
-import { getActiveTenantCookieName } from "@/lib/auth/jwt";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
+import { getActiveTenantAccess, hasTenantRole } from "@/lib/server/tenant-access";
+import { dashboardSettingsSchema } from "@/lib/validation/dashboard-settings";
 
-async function getActiveTenant(userId: string) {
-  const cookieStore = await cookies();
-  const activeTenantSlug = cookieStore.get(getActiveTenantCookieName())?.value;
+function normalizeOptionalField(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = value.trim();
+  return normalized.length ? normalized : null;
+}
 
-  if (!activeTenantSlug) return null;
+export async function GET() {
+  const authUser = await getAuthUser();
+  if (!authUser) return jsonError("Nao autenticado.", 401);
 
-  return prisma.tenant.findFirst({
-    where: {
-      slug: activeTenantSlug,
-      OR: [
-        { ownerId: userId },
-        {
-          members: {
-            some: {
-              userId,
-              revokedAt: null,
-            },
-          },
-        },
-      ],
-    },
+  const access = await getActiveTenantAccess(authUser.userId);
+  if (!access) return jsonError("Organizacao ativa nao encontrada.", 404);
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: access.id },
     include: {
       connections: {
         where: {
@@ -36,22 +33,10 @@ async function getActiveTenant(userId: string) {
       },
     },
   });
-}
 
-export async function GET() {
-  const authUser = await getAuthUser();
+  if (!tenant) return jsonError("Organizacao ativa nao encontrada.", 404);
 
-  if (!authUser) {
-    return NextResponse.json({ success: false, error: "Nao autenticado." }, { status: 401 });
-  }
-
-  const tenant = await getActiveTenant(authUser.userId);
-
-  if (!tenant) {
-    return NextResponse.json({ success: false, error: "Organizacao ativa nao encontrada." }, { status: 404 });
-  }
-
-  return NextResponse.json({
+  return jsonNoStore({
     success: true,
     tenant: {
       id: tenant.id,
@@ -80,86 +65,93 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const authUser = await getAuthUser();
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) return jsonError("Nao autenticado.", 401);
 
-  if (!authUser) {
-    return NextResponse.json({ success: false, error: "Nao autenticado." }, { status: 401 });
-  }
+    const access = await getActiveTenantAccess(authUser.userId);
+    if (!access) return jsonError("Organizacao ativa nao encontrada.", 404);
 
-  const tenant = await getActiveTenant(authUser.userId);
+    if (!hasTenantRole(access, [TenantRole.OWNER, TenantRole.ADMIN])) {
+      return jsonError("Sem permissao para editar configuracoes.", 403);
+    }
 
-  if (!tenant) {
-    return NextResponse.json({ success: false, error: "Organizacao ativa nao encontrada." }, { status: 404 });
-  }
+    const payload = dashboardSettingsSchema.parse(await request.json());
+    const customDomain = normalizeOptionalField(payload.customDomain);
 
-  const payload = await request.json();
-  const customDomain = payload?.customDomain ? String(payload.customDomain).trim().toLowerCase() : null;
+    if (customDomain && /(^https?:\/\/)|\//i.test(customDomain)) {
+      return jsonError("Informe apenas o host de dominio, sem protocolo ou barras.", 400);
+    }
 
-  if (customDomain && /(^https?:\/\/)|\//i.test(customDomain)) {
-    return NextResponse.json(
-      { success: false, error: "Informe apenas o host de dominio, sem protocolo ou barras." },
-      { status: 400 },
-    );
-  }
+    if (customDomain && customDomain === access.slug) {
+      return jsonError("Dominio customizado invalido.", 400);
+    }
 
-  if (customDomain && customDomain === tenant.slug) {
-    return NextResponse.json(
-      { success: false, error: "Dominio customizado invalido." },
-      { status: 400 },
-    );
-  }
+    if (customDomain) {
+      const domainOwner = await prisma.tenant.findFirst({
+        where: {
+          customDomain,
+          id: { not: access.id },
+        },
+        select: { id: true },
+      });
 
-  if (customDomain) {
-    const domainOwner = await prisma.tenant.findFirst({
-      where: {
-        customDomain,
-        id: { not: tenant.id },
-      },
-      select: { id: true },
+      if (domainOwner) {
+        return jsonError("Esse dominio ja esta em uso por outra organizacao.", 409);
+      }
+    }
+
+    const currentTenant = await prisma.tenant.findUnique({
+      where: { id: access.id },
+      select: { name: true },
     });
 
-    if (domainOwner) {
-      return NextResponse.json(
-        { success: false, error: "Esse dominio ja esta em uso por outra organizacao." },
-        { status: 409 },
-      );
+    if (!currentTenant) return jsonError("Organizacao ativa nao encontrada.", 404);
+
+    const updated = await prisma.tenant.update({
+      where: { id: access.id },
+      data: {
+        name: normalizeOptionalField(payload.name) ?? currentTenant.name,
+        customDomain,
+        metaTitle: normalizeOptionalField(payload.metaTitle),
+        metaDescription: normalizeOptionalField(payload.metaDescription),
+        favicon: normalizeOptionalField(payload.favicon),
+        logo: normalizeOptionalField(payload.logo),
+        instagram: normalizeOptionalField(payload.instagram),
+        telegram: normalizeOptionalField(payload.telegram),
+        supportUrl: normalizeOptionalField(payload.supportUrl),
+      },
+    });
+
+    return jsonNoStore({
+      success: true,
+      tenant: {
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        customDomain: updated.customDomain,
+        metaTitle: updated.metaTitle,
+        metaDescription: updated.metaDescription,
+        favicon: updated.favicon,
+        logo: updated.logo,
+        instagram: updated.instagram,
+        telegram: updated.telegram,
+        supportUrl: updated.supportUrl,
+        planName: updated.planName,
+        planPriceMonthly: updated.planPriceMonthly,
+        billingDay: updated.billingDay,
+        nextBillingAt: updated.nextBillingAt,
+        subscriptionStatus: updated.subscriptionStatus,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return jsonError("Payload invalido.", 400, {
+        issues: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      });
     }
+
+    console.error("Erro ao atualizar configuracoes:", error);
+    return jsonError("Erro interno do servidor.", 500);
   }
-
-  const updated = await prisma.tenant.update({
-    where: { id: tenant.id },
-    data: {
-      name: String(payload?.name ?? tenant.name).trim() || tenant.name,
-      customDomain,
-      metaTitle: payload?.metaTitle ? String(payload.metaTitle).trim() : null,
-      metaDescription: payload?.metaDescription ? String(payload.metaDescription).trim() : null,
-      favicon: payload?.favicon ? String(payload.favicon).trim() : null,
-      logo: payload?.logo ? String(payload.logo).trim() : null,
-      instagram: payload?.instagram ? String(payload.instagram).trim() : null,
-      telegram: payload?.telegram ? String(payload.telegram).trim() : null,
-      supportUrl: payload?.supportUrl ? String(payload.supportUrl).trim() : null,
-    },
-  });
-
-  return NextResponse.json({
-    success: true,
-    tenant: {
-      id: updated.id,
-      name: updated.name,
-      slug: updated.slug,
-      customDomain: updated.customDomain,
-      metaTitle: updated.metaTitle,
-      metaDescription: updated.metaDescription,
-      favicon: updated.favicon,
-      logo: updated.logo,
-      instagram: updated.instagram,
-      telegram: updated.telegram,
-      supportUrl: updated.supportUrl,
-      planName: updated.planName,
-      planPriceMonthly: updated.planPriceMonthly,
-      billingDay: updated.billingDay,
-      nextBillingAt: updated.nextBillingAt,
-      subscriptionStatus: updated.subscriptionStatus,
-    },
-  });
 }

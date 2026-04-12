@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 import prisma from "@/lib/database/prisma";
 import { getAuthUser } from "@/lib/auth/mddleware";
 
@@ -12,20 +13,31 @@ type MercadoPagoOAuthResponse = {
   live_mode?: boolean;
 };
 
-function getBaseUrl(request: NextRequest): string {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+function getBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (envUrl) return envUrl.replace(/\/$/, "");
 
-  const host = request.headers.get("host") || "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  return `${protocol}://${host}`;
+  return "http://localhost:3000";
+}
+
+function signState(payload: string): string {
+  const secret = process.env.MP_OAUTH_STATE_SECRET || process.env.JWT_SECRET || "dev-mp-oauth-secret";
+  return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
 function parseState(state: string | null): { tenantId: string; userId: string } | null {
   if (!state) return null;
 
   try {
-    const decoded = Buffer.from(state, "base64url").toString("utf8");
+    const [payload, signature] = state.split(".");
+    if (!payload || !signature) return null;
+
+    const expectedSignature = signState(payload);
+    if (signature.length !== expectedSignature.length) return null;
+    const isValidSignature = timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    if (!isValidSignature) return null;
+
+    const decoded = Buffer.from(payload, "base64url").toString("utf8");
     const parsed = JSON.parse(decoded) as { tenantId?: string; userId?: string };
     if (!parsed.tenantId || !parsed.userId) return null;
     return { tenantId: parsed.tenantId, userId: parsed.userId };
@@ -35,7 +47,7 @@ function parseState(state: string | null): { tenantId: string; userId: string } 
 }
 
 export async function GET(request: NextRequest) {
-  const baseUrl = getBaseUrl(request);
+  const baseUrl = getBaseUrl();
 
   const authUser = await getAuthUser();
   if (!authUser) {
