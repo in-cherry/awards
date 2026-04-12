@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/database/prisma";
 import { getClientAuthUser } from "@/lib/auth/mddleware";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
 import {
   MYSTERY_BOX_LEGACY_LOCK_DISPLAY_NAME,
   MYSTERY_BOX_LEGACY_LOCK_NAME,
@@ -29,12 +30,12 @@ export async function GET(request: NextRequest) {
   try {
     const authClient = await getClientAuthUser();
     if (!authClient || !authClient.tenantId) {
-      return NextResponse.json({ success: false, error: "Nao autenticado." }, { status: 401 });
+      return jsonError("Nao autenticado.", 401);
     }
 
     const slug = String(request.nextUrl.searchParams.get("slug") || "").trim().toLowerCase();
     if (!slug) {
-      return NextResponse.json({ success: false, error: "Slug obrigatorio." }, { status: 400 });
+      return jsonError("Slug obrigatorio.", 400);
     }
 
     const tenant = await prisma.tenant.findUnique({
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!tenant || tenant.id !== authClient.tenantId) {
-      return NextResponse.json({ success: false, error: "Sessao invalida para esta organizacao." }, { status: 403 });
+      return jsonError("Sessao invalida para esta organizacao.", 403);
     }
 
     const client = await prisma.client.findFirst({
@@ -119,7 +120,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!client) {
-      return NextResponse.json({ success: false, error: "Cliente nao encontrado." }, { status: 404 });
+      return jsonError("Cliente nao encontrado.", 404);
     }
 
     const winnerTicketByRaffleId = new Map<string, string>();
@@ -245,7 +246,7 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       client: {
         id: client.id,
@@ -302,6 +303,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erro ao buscar perfil do cliente:", error);
-    return NextResponse.json({ success: false, error: "Erro interno do servidor." }, { status: 500 });
+    return jsonError("Erro interno do servidor.", 500);
   }
 }

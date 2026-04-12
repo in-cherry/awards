@@ -1,65 +1,94 @@
 import { getAuthUser } from "@/lib/auth/mddleware";
 import prisma from "@/lib/database/prisma";
-import type { Prisma } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { jsonError, jsonNoStore } from "@/lib/server/http";
 
-type UserWithTenantAccess = Prisma.UserGetPayload<{
-  include: {
-    profile: true;
-    ownedTenants: true;
-    memberTenants: {
-      include: {
-        tenant: true;
-      };
-    };
-  };
-}>;
+function maskCpf(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 4) return "***";
+  return `***.***.***-${digits.slice(-2)}`;
+}
+
+function maskPhone(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 4) return "***";
+  return `(**) *****-${digits.slice(-4)}`;
+}
 
 export async function GET() {
   try {
     const authUser = await getAuthUser();
 
     if (!authUser) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+      return jsonError("Nao autenticado", 401);
     }
 
-    const user = (await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: authUser.userId },
-      include: {
-        profile: true,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        cpf: true,
+        isActive: true,
+        emailVerifiedAt: true,
+        profile: {
+          select: {
+            nickname: true,
+            avatar: true,
+            banner: true,
+            slug: true,
+          },
+        },
         ownedTenants: true,
         memberTenants: {
-          include: { tenant: true },
+          include: {
+            tenant: true,
+          },
         },
       },
-    })) as UserWithTenantAccess | null;
+    });
 
     if (!user) {
-      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+      return jsonError("Nao autenticado", 401);
     }
 
-    return NextResponse.json({
+    return jsonNoStore({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        phone: user.phone,
-        cpf: user.cpf,
+        phoneMasked: maskPhone(user.phone),
+        cpfMasked: maskCpf(user.cpf),
+        isActive: user.isActive,
+        emailVerifiedAt: user.emailVerifiedAt,
         profile: user.profile,
       },
       tenants: [
-        ...user.ownedTenants.map((t) => ({ ...t, role: "OWNER" })),
+        ...user.ownedTenants.map((t) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          customDomain: t.customDomain,
+          logo: t.logo,
+          planName: t.planName,
+          subscriptionStatus: t.subscriptionStatus,
+          role: "OWNER",
+        })),
         ...user.memberTenants.map((m) => ({
-          ...m.tenant,
+          id: m.tenant.id,
+          name: m.tenant.name,
+          slug: m.tenant.slug,
+          customDomain: m.tenant.customDomain,
+          logo: m.tenant.logo,
+          planName: m.tenant.planName,
+          subscriptionStatus: m.tenant.subscriptionStatus,
           role: m.role,
         })),
       ],
     });
   } catch (error) {
     console.error("Erro ao buscar usuário:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
+    return jsonError("Erro interno do servidor", 500);
   }
 }
