@@ -106,7 +106,7 @@ export function Header() {
           style={{ display: "inline-block" }}
         >
           <Image
-            src={`${tenant?.logoUrl || "/winzy_logo.png"}`}
+            src={`${tenant?.logoUrl || "/incherry_logo.svg"}`}
             alt={tenant?.name ? `${tenant.name} Logo` : "InCherry Logo"}
             width={32}
             height={32}

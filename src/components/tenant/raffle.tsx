@@ -4,10 +4,24 @@ import { useApp } from "@/contexts";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { BadgeCheck, Check, CircleHelp, Gift, Instagram, MessageCircle, Minus, Plus, ShoppingBag, Ticket, Trophy, Users, User, X } from "lucide-react";
+import { BadgeCheck, Check, CircleHelp, Gift, Instagram, MessageCircle, Minus, Plus, ShoppingBag, Ticket, Trophy, Users, User, X, Sparkles } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+
+function formatCollaboratorName(fullName: string) {
+  if (!fullName) return "";
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+
+  const ignoreWords = ["de", "da", "do", "das", "dos"];
+  const validParts = parts.filter(part => !ignoreWords.includes(part.toLowerCase()));
+  
+  if (validParts.length === 0) return fullName;
+  if (validParts.length === 1) return validParts[0];
+  
+  return `${validParts[0]} ${validParts[1]}`;
+}
 
 type RankingEntry = {
   position: number;
@@ -68,7 +82,7 @@ type PixPaymentApiResponse = {
 };
 
 export function Raffle() {
-  const { tenant, raffle, user, ticketCount, setTicketCount } = useApp();
+  const { tenant, raffle, user, ticketCount, setTicketCount, setIsLoginModalOpen } = useApp();
 
   const formattedDescription = useMemo(() => {
     const rawDescription = raffle?.description ?? "";
@@ -94,6 +108,27 @@ export function Raffle() {
   const [pixDialogMinimized, setPixDialogMinimized] = useState(false);
   const [activeRankCard, setActiveRankCard] = useState<string | null>(null);
 
+  const [ticketInputValue, setTicketInputValue] = useState<string>(ticketCount.toString());
+  const [authErrorModalOpen, setAuthErrorModalOpen] = useState(false);
+  const [countdownToLogin, setCountdownToLogin] = useState(10);
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<"confirmation" | "payment">("confirmation");
+
+  useEffect(() => {
+    setTicketInputValue(ticketCount.toString());
+  }, [ticketCount]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (authErrorModalOpen && countdownToLogin > 0) {
+      timer = setTimeout(() => setCountdownToLogin(prev => prev - 1), 1000);
+    } else if (authErrorModalOpen && countdownToLogin === 0) {
+      setAuthErrorModalOpen(false);
+      window.location.href = `/${tenant?.slug || ''}/login`;
+    }
+    return () => clearTimeout(timer);
+  }, [authErrorModalOpen, countdownToLogin, tenant?.slug]);
+
   /**
    * Calcula caixas ganhas para uma quantidade específica de bilhetes.
    * Máximo 6 caixas por lote de compra.
@@ -110,6 +145,22 @@ export function Raffle() {
       const newCount = Math.max(raffle?.minNumbers ?? 1, prev + qty);
       return Math.min(newCount, 2000); // Limita a 2000 bilhetes
     });
+  };
+
+  const handleTicketInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, "");
+    setTicketInputValue(value);
+  };
+
+  const handleTicketInputBlur = () => {
+    let value = parseInt(ticketInputValue, 10);
+    if (isNaN(value) || value < (raffle?.minNumbers ?? 1)) {
+      value = raffle?.minNumbers ?? 1;
+    } else if (value > 2000) {
+      value = 2000;
+    }
+    setTicketCount(value);
+    setTicketInputValue(value.toString());
   };
 
   const handleIncrease = () => {
@@ -195,13 +246,13 @@ export function Raffle() {
 
   useEffect(() => {
     async function fetchRanking() {
-      if (!tenant?.slug || !raffle?.id || !showCollaboratorRanking) {
+      if (!tenant?.slug || !showCollaboratorRanking) {
         setRankingList([]);
         setUserRankingPosition(null);
         return;
       }
       try {
-        const res = await fetch(`/api/ranking/${tenant.slug}?raffleId=${raffle.id}`);
+        const res = await fetch(`/api/ranking/${tenant.slug}`);
         if (res.ok) {
           const data = (await res.json()) as RankingResponse;
           setRankingList(data.ranking || []);
@@ -212,7 +263,7 @@ export function Raffle() {
       }
     }
     fetchRanking();
-  }, [tenant?.slug, raffle?.id, showCollaboratorRanking]);
+  }, [tenant?.slug, showCollaboratorRanking]);
 
   const rankingPrizeByPosition = useMemo(() => {
     const first = typeof raffle?.collaboratorPrizeFirst === "number" && raffle.collaboratorPrizeFirst > 0
@@ -246,14 +297,11 @@ export function Raffle() {
   if (!raffle) return null;
 
   async function requestPixPayment(forceNewPayment: boolean) {
-    if (!raffle || !tenant) return;
+    if (!raffle || !tenant || !user) return;
 
     setCheckoutError(null);
 
-    if (!user?.name || !user?.email || !user?.cpf || !user?.phone) {
-      setCheckoutError("Para pagar com PIX, complete seu cadastro com nome, email, CPF e telefone.");
-      return;
-    }
+    // A validação de usuário já ocorre em handlePixPayment.
 
     setIsPaying(true);
 
@@ -287,7 +335,7 @@ export function Raffle() {
         });
         setCheckoutInfo(null);
         setPixDialogMinimized(false);
-        setPixDialogOpen(true);
+        setCheckoutStep("payment");
         return;
       }
 
@@ -311,7 +359,7 @@ export function Raffle() {
         createdAt: data.payment.createdAt,
       });
       setPixDialogMinimized(false);
-      setPixDialogOpen(true);
+      setCheckoutStep("payment");
     } catch {
       setCheckoutError("Erro de conexao ao gerar pagamento PIX.");
     } finally {
@@ -320,39 +368,88 @@ export function Raffle() {
   }
 
   async function handlePixPayment() {
+    setCheckoutError(null);
+    if (!user?.name || !user?.email || !user?.cpf || !user?.phone) {
+      setCountdownToLogin(10);
+      setAuthErrorModalOpen(true);
+      return;
+    }
     setCheckoutInfo(null);
     setPendingPaymentOffer(null);
-    await requestPixPayment(false);
+    setCheckoutStep("confirmation");
+    setCheckoutModalOpen(true);
   }
 
   function minimizePixDialog() {
-    setPixDialogOpen(false);
+    setCheckoutModalOpen(false);
     if (checkoutInfo || pendingPaymentOffer) {
       setPixDialogMinimized(true);
     }
   }
 
   function closePixDialogCompletely() {
-    setPixDialogOpen(false);
+    setCheckoutModalOpen(false);
     setPixDialogMinimized(false);
     setCheckoutInfo(null);
     setPendingPaymentOffer(null);
   }
 
   return (
+
+
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="flex flex-col gap-6 px-3 py-4 sm:gap-8 sm:px-0"
     >
+
+      {/* Background blobs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] animate-blob" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000" />
+        <div className="absolute top-[40%] left-[30%] w-[30%] h-[30%] bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-4000" />
+      </div>
+
       {/* Detalhes da Rifa */}
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 backdrop-blur-xl">
+        <div className="relative overflow-hidden rounded-xl">
+          {raffle?.bannerUrl ? (
+            <>
+              <Image
+                src={raffle.bannerUrl}
+                alt={raffle.title}
+                width={800}
+                height={400}
+                className="w-full aspect-[5/4] object-cover transition-transform duration-500 hover:scale-105"
+              />
+
+              <motion.div
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="absolute bottom-3 left-3 flex flex-col items-center justify-center rounded-xl bg-[#11161d]/80 px-3 py-1.5 leading-tight shadow-xl backdrop-blur-md sm:bottom-5 sm:left-5 sm:px-4"
+              >
+                <span className="text-[7px] font-bold text-stone-400 uppercase tracking-widest text-center">por apenas</span>
+                <span className="text-sm font-black text-white text-center">{raffle?.price ? formatCurrency(Number(raffle.price)) : 'Preço não disponível'}</span>
+              </motion.div>
+            </>
+          ) : (
+            <div className="flex aspect-[5/4] items-center justify-center bg-white/5 md:aspect-[16/11]">
+              <p className="text-sm font-black uppercase text-stone-500">Sem imagem</p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs text-stone-500">{raffle?.drawDate ? `Criada em ${formatDate(String(raffle.drawDate))}` : 'Criada recentemente'}</p>
+        </div>
+
         <div>
           <button
             type="button"
             onClick={() => setIsOwnerCardOpen((prev) => !prev)}
-            className="flex w-full items-center gap-3 rounded-xl p-1 text-left transition-colors hover:bg-white/5 sm:gap-4"
+            className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-white/5 sm:gap-4"
           >
             <Avatar size="lg">
               {tenant?.owner?.avatarUrl ? (
@@ -372,8 +469,8 @@ export function Raffle() {
                 <BadgeCheck size={16} className="ml-1 text-emerald-500" />
               </div>
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm text-gray-300 uppercase font-mono font-semibold">{raffle?.title}</span>
-                <span className="text-xs text-gray-300 font-mono">ou {formatCurrency(Number(raffle?.pixText) || 0)} no PIX</span>
+                <span className="text-sm text-gray-300 uppercase font-semibold">{raffle?.title}</span>
+                <span className="text-xs text-gray-300 font-semibold">ou {formatCurrency(Number(raffle?.pixText) || 0)} no PIX</span>
               </div>
             </div>
           </button>
@@ -417,38 +514,6 @@ export function Raffle() {
             </div>
           )}
         </div>
-
-        <div className="relative overflow-hidden rounded-xl">
-          {raffle?.bannerUrl ? (
-            <>
-              <Image
-                src={raffle.bannerUrl}
-                alt={raffle.title}
-                width={800}
-                height={400}
-                className="w-full aspect-[5/4] object-cover transition-transform duration-500 hover:scale-105"
-              />
-
-              <motion.div
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="absolute bottom-3 left-3 flex flex-col items-center justify-center rounded-xl bg-[#11161d]/80 px-3 py-1.5 leading-tight shadow-xl backdrop-blur-md sm:bottom-5 sm:left-5 sm:px-4"
-              >
-                <span className="text-[7px] font-bold text-stone-400 uppercase tracking-widest text-center">por apenas</span>
-                <span className="text-sm font-black text-white text-center">{raffle?.price ? formatCurrency(Number(raffle.price)) : 'Preço não disponível'}</span>
-              </motion.div>
-            </>
-          ) : (
-            <div className="flex aspect-[5/4] items-center justify-center bg-white/5 md:aspect-[16/11]">
-              <p className="text-sm font-black uppercase text-stone-500">Sem imagem</p>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <p className="text-xs text-stone-500">{raffle?.drawDate ? `Criada em ${formatDate(String(raffle.drawDate))}` : 'Criada recentemente'}</p>
-        </div>
       </div>
 
       {/* Botão Ver Meus Bilhetes */}
@@ -461,130 +526,41 @@ export function Raffle() {
         </div>
       )}
 
-      {/* Descrição da Rifa */}
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
-        <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
-          <div className="flex items-center">
-            <CircleHelp size={16} className="mr-2 text-emerald-400" />
-            <h2 className="text-lg font-mono text-emerald-400 uppercase">Descrição / Regulamento</h2>
-          </div>
-        </div>
-
-        <p className="text-sm text-zinc-400 whitespace-pre-line">
-          {formattedDescription}
-        </p>
-      </div>
-
-      {/* Ranking */}
-      {showCollaboratorRanking ? (
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
-          <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
-            <div className="flex items-center">
-              <Users size={16} className="mr-2 text-emerald-400" />
-              <h2 className="text-lg font-mono text-emerald-400 uppercase">Ranking dos Colaboradores</h2>
-            </div>
-          </div>
-
-          <p className="text-sm text-zinc-300">Um prêmio garantido para os maiores compradores!</p>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-            {rankPrizeCards.map((card) => {
-              const isActive = activeRankCard === card.positionLabel;
-
-              return (
-                <button
-                  key={card.positionLabel}
-                  type="button"
-                  onClick={() => setActiveRankCard((prev) => (prev === card.positionLabel ? null : card.positionLabel))}
-                  className="group h-20 cursor-pointer [perspective:1000px]"
-                  aria-label={`Mostrar premio do ${card.positionLabel}`}
-                >
-                  <div className={`relative h-full w-full rounded-lg border border-white/5 ${card.cardClass}`}>
-                    <div className={`absolute inset-0 transition-transform duration-500 [transform-style:preserve-3d] sm:group-hover:[transform:rotateY(180deg)] will-change-transform ${isActive ? "[transform:rotateY(180deg)]" : ""}`}>
-                      <div className="absolute inset-0 flex items-center justify-center [backface-visibility:hidden]">
-                        <span className={`text-2xl font-bold ${card.positionColorClass}`}>{card.positionLabel}</span>
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-center [transform:rotateY(180deg)] [backface-visibility:hidden] px-2 text-center">
-                        <span className="text-sm font-bold text-zinc-100">{card.prizeLabel}</span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="border-t border-slate-500/5">
-            {rankingList.length === 0 ? (
-              <p className="text-center text-xs text-stone-500 py-4">Nenhum colaborador ainda.</p>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-white/5 bg-transparent">
-                <div className="grid grid-cols-[80px_1fr_120px_120px] gap-2 px-4 py-3 bg-transparent border-b border-white/5 border-dashed">
-                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Colocação</span>
-                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Nome</span>
-                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Bilhete</span>
-                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Prêmio</span>
-                </div>
-                {rankingList.slice(0, 3).map((u, idx) => (
-                  <div
-                    key={u.position}
-                    className={`grid grid-cols-[80px_1fr_120px_120px] gap-2 items-center px-4 py-3 transition-colors ${idx !== 0 ? 'border-t border-white/5' : ''} bg-transparent`}
-                  >
-                    <div className="flex items-center justify-center">
-                      <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-black ${u.color ?? 'border-white/10 bg-white/5 text-stone-400'
-                        }`}>
-                        {u.position <= 3 ? <Trophy size={14} /> : u.position}
-                      </span>
-                    </div>
-                    <span className="text-xs font-medium text-stone-300 truncate text-center">{u.name}</span>
-                    <span className="text-[11px] font-bold text-stone-300 tabular-nums text-center">
-                      {u.tickets.toLocaleString('pt-BR')} {u.tickets === 1 ? "bilhete" : "bilhetes"}
-                    </span>
-                    <span className="text-[11px] font-semibold text-stone-300 truncate text-center">{rankingPrizeByPosition[u.position] ?? "Nao definido"}</span>
-                  </div>
-                ))}
-                {user && (
-                  <div className="py-2.5 text-center bg-transparent border-t border-white/5">
-                    {userRankingPosition ? (
-                      <>
-                        <p className="text-[9px] text-stone-500 font-medium">Sua posicao: #{userRankingPosition.position}</p>
-                        <p className="text-[10px] text-stone-400">{userRankingPosition.tickets.toLocaleString("pt-BR")} bilhetes</p>
-                      </>
-                    ) : (
-                      <p className="text-[10px] text-stone-400">Voce ainda nao possui bilhetes para entrar no ranking.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-
       {/* Caixa Misteriosa */}
       {hasConfiguredMysteryPrizes && hasAvailableMysteryPrizes ? (
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
-          <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
-            <div className="flex items-center">
-              <ShoppingBag size={16} className="mr-2 text-emerald-400" />
-              <h2 className="text-lg font-mono text-emerald-400 uppercase">Caixa Mistériosa</h2>
+        <div className="mx-auto w-full max-w-2xl relative bg-linear-to-br from-purple-900/40 to-indigo-900/40 backdrop-blur-md border border-purple-500/30 rounded-[32px] p-5 md:p-8 overflow-hidden group">
+          {/* Background */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/20 blur-[80px] group-hover:bg-purple-500/30 transition-all" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/20 blur-[80px] group-hover:bg-indigo-500/30 transition-all" />
+
+          {/* Header */}
+          <div className="relative z-10 flex items-center gap-6">
+
+            {/* Icon box */}
+            <div className="w-20 h-20 bg-linear-to-br from-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/20 group-hover:scale-110 transition-transform duration-500">
+              <Gift size={40} className="text-white animate-bounce" />
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-yellow-400" />
+                <h3 className="text-lg md:text-xl text-white font-black font-display tracking-tight">CAIXA MISTERIOSA</h3>
+              </div>
+              <p className="text-xs text-purple-200 font-medium leading-relaxed">
+                Ganhe caixas ao comprar grandes quantidades e concorra a prêmios instantâneos!
+              </p>
             </div>
           </div>
 
-          <p className="text-sm text-zinc-300">Ganhe caixas ao comprar em grandes quantidades e concorra a prêmios instantâneos!</p>
+          {/* Options */}
+          <div className="mt-8 grid grid-cols-3 gap-3">
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+            {/* Item */}
             {mysteryBoxRules.map((rule) => (
-              <div
-                key={`${rule.boxes}-${rule.minTickets}`}
-                className="flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-slate-800/40 p-4"
-              >
-                <span className="text-sm font-mono uppercase text-zinc-300">
-                  {rule.boxes} {rule.boxes === 1 ? "caixa" : "caixas"}
-                </span>
-                <span className="text-xs font-mono uppercase text-zinc-500">
-                  {rule.minTickets} bilhetes
-                </span>
+              <div key={`${rule.boxes}-${rule.minTickets}`} className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center space-y-1 group-hover:border-purple-500/30 transition-all">
+                <p className="text-[10px] font-black text-purple-300 uppercase tracking-widest">{rule.minTickets} BILHETES</p>
+                <p className="text-sm md:text-lg font-black text-white">{rule.boxes} {rule.boxes === 1 ? "Caixa" : "Caixas"}</p>
               </div>
             ))}
           </div>
@@ -596,10 +572,10 @@ export function Raffle() {
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
           <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
             <div className="flex items-center">
-              <Gift size={16} className="mr-2 text-emerald-400" />
-              <h2 className="text-lg font-mono text-emerald-400 uppercase">Prêmios das Caixas</h2>
+              <Trophy size={16} className="mr-2 text-emerald-400" />
+              <h2 className="text-sm font-bold text-emerald-400 uppercase">Prêmios das Caixas</h2>
             </div>
-            <span className="text-xs font-mono uppercase text-zinc-500">
+            <span className="text-xs font-semibold uppercase text-zinc-500">
               {prizes.filter(p => p.remaining > 0).length} disponíveis
             </span>
           </div>
@@ -637,13 +613,10 @@ export function Raffle() {
                           : prize.title}
                       </p>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className={`text-xs font-medium ${isAvailable ? "text-slate-400" : "text-slate-600"}`}>
+                    <div className="flex-shrink-0">
+                      <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${isAvailable ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800/50 text-slate-500 border border-slate-700/50"}`}>
                         {isAvailable ? "DISPONÍVEL" : "RESGATADO"}
-                      </p>
-                      {isAvailable && (
-                        <p className="text-sm font-bold text-emerald-300">{prize.remaining}</p>
-                      )}
+                      </span>
                     </div>
                   </div>
                 );
@@ -655,16 +628,16 @@ export function Raffle() {
 
       {/* Bilheteria */}
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
-        <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
+        <div className="flex items-center border-b border-slate-500/5 pb-2 justify-center">
           <div className="flex items-center">
             <Ticket size={16} className="mr-2 text-emerald-400" />
-            <h2 className="text-lg font-mono text-emerald-400 uppercase">Bilheteria</h2>
+            <h2 className="text-sm font-bold text-emerald-400 uppercase">Selecione a quantidade de bilhetes</h2>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           {[5, 10, 100].map((value) => (
-            <button key={value} onClick={() => handleQuantitySelect(value)} className="flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-slate-800/40 p-3 text-zinc-200 tabular-nums sm:p-4">
+            <button key={value} onClick={() => handleQuantitySelect(value)} className="cursor-pointer flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-slate-800/40 p-3 text-zinc-200 tabular-nums sm:p-4">
               +{value}
             </button>
           ))}
@@ -675,19 +648,25 @@ export function Raffle() {
             whileTap={{ scale: 0.9 }}
             onClick={handleDecrease}
             disabled={ticketCount <= raffle.minNumbers}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-slate-800/40 transition-all hover:bg-slate-700/40 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-slate-800/40 transition-all hover:bg-slate-700/40 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Minus size={16} className="text-stone-400" />
           </motion.button>
 
           <div className="flex flex-col items-center justify-center">
-            <span className="text-2xl font-black text-white tabular-nums leading-none mb-1">{ticketCount}</span>
+            <input
+              type="text"
+              value={ticketInputValue}
+              onChange={handleTicketInputChange}
+              onBlur={handleTicketInputBlur}
+              className="w-24 text-center bg-transparent text-2xl font-black text-white tabular-nums leading-none mb-1 focus:outline-none"
+            />
           </div>
 
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={handleIncrease}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-slate-800/40 transition-all hover:bg-slate-700/40"
+            className="cursor-pointer flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-slate-800/40 transition-all hover:bg-slate-700/40"
           >
             <Plus size={16} className="text-stone-400" />
           </motion.button>
@@ -695,19 +674,19 @@ export function Raffle() {
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           {[5, 10, 100].map((value) => (
-            <button key={`minus-${value}`} onClick={() => handleQuantitySelect(-value)} disabled={ticketCount <= raffle.minNumbers} className="flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-slate-800/40 p-3 text-zinc-200 tabular-nums sm:p-4 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity">
+            <button key={`minus-${value}`} onClick={() => handleQuantitySelect(-value)} disabled={ticketCount <= raffle.minNumbers} className="cursor-pointer flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-slate-800/40 p-3 text-zinc-200 tabular-nums sm:p-4 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity">
               -{value}
             </button>
           ))}
         </div>
 
         <div className="flex items-center justify-center">
-          <span className="text-xs uppercase font-mono text-zinc-500">O mínimo para compra é de {raffle.minNumbers} bilhete{raffle.minNumbers > 1 ? "s" : ""}</span>
+          <span className="text-xs uppercase font-semibold text-zinc-500">O mínimo para compra é de {raffle.minNumbers} bilhete{raffle.minNumbers > 1 ? "s" : ""}</span>
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-slate-800/40 px-4 py-4">
           <div className="flex flex-col">
-            <span className="text-xs uppercase font-mono text-zinc-500">Total a pagar</span>
+            <span className="text-xs uppercase font-semibold text-zinc-500">Total a pagar</span>
             <span className="text-lg font-bold text-white">{formatCurrency((Number(raffle.price) || 0) * ticketCount)}</span>
           </div>
           {hasAvailableMysteryPrizes ? (
@@ -715,7 +694,7 @@ export function Raffle() {
               <div className="rounded-xl">
                 <Gift size={16} className="text-zinc-500" />
               </div>
-              <span className="text-xs font-mono uppercase text-zinc-500">
+              <span className="text-xs font-semibold uppercase text-zinc-500">
                 Você ganha<br />{getBoxesFromTickets(ticketCount)} caixa{getBoxesFromTickets(ticketCount) !== 1 ? "s" : ""}
               </span>
             </div>
@@ -727,7 +706,7 @@ export function Raffle() {
           whileTap={{ scale: 0.98 }}
           onClick={handlePixPayment}
           disabled={isPaying}
-          className="w-full items-center rounded-2xl bg-emerald-500 p-4 text-sm font-mono font-bold uppercase tracking-widest text-[#0B1120] shadow-[0_4px_24px_rgba(16,185,129,0.25)] transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
+          className="cursor-pointer w-full items-center rounded-2xl bg-emerald-500 p-4 text-sm font-semibold font-bold uppercase tracking-widest text-[#0B1120] shadow-[0_4px_24px_rgba(16,185,129,0.25)] transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isPaying ? "Gerando PIX..." : "Pagar com PIX"}
         </motion.button>
@@ -739,114 +718,186 @@ export function Raffle() {
         )}
       </div>
 
-      <Dialog.Root
-        open={pixDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            minimizePixDialog();
-            return;
-          }
-
-          setPixDialogOpen(true);
-          setPixDialogMinimized(false);
-        }}
-      >
+      <Dialog.Root open={authErrorModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          setAuthErrorModalOpen(false);
+          setCountdownToLogin(10);
+        }
+      }}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl outline-none">
-            <div className="mb-3 flex items-center justify-between">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-red-500/20 bg-slate-900 p-6 shadow-2xl outline-none">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                <CircleHelp size={24} className="text-red-400" />
+              </div>
               <div>
-                <Dialog.Title className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
-                  Pagamento PIX
-                </Dialog.Title>
-                <Dialog.Description className="text-xs text-slate-400">
-                  Copie o codigo ou escaneie o QR Code para pagar.
+                <Dialog.Title className="text-lg font-bold text-white">Cadastro Incompleto</Dialog.Title>
+                <Dialog.Description className="text-sm text-slate-300 mt-2">
+                  Para concluir sua compra e pagar com PIX, você precisa estar logado com nome, email, CPF e telefone válidos.
                 </Dialog.Description>
               </div>
-
-              <button
+              <p className="text-xs font-semibold text-red-300 mt-2">Redirecionando para o login em {countdownToLogin} segundos...</p>
+              <button 
                 type="button"
-                onClick={minimizePixDialog}
-                className="rounded-md border border-white/15 p-1 text-slate-300 hover:bg-white/10 hover:text-white"
-                aria-label="Minimizar"
+                onClick={() => {
+                  setAuthErrorModalOpen(false);
+                  window.location.href = `/${tenant?.slug || ''}/login`;
+                }}
+                className="cursor-pointer w-full rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold py-3 mt-2 transition-colors"
               >
-                <X className="h-4 w-4" />
+                Fazer Login Agora
               </button>
             </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
-            {pendingPaymentOffer && !checkoutInfo ? (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 p-3 text-sm text-amber-100">
-                  Ja existe um pagamento pendente para esta mesma quantidade de bilhetes. Deseja continuar com ele?
-                </div>
+      <Dialog.Root open={checkoutModalOpen} onOpenChange={(open) => {
+        if (!open) closePixDialogCompletely();
+      }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[96vw] max-w-3xl max-h-[90vh] overflow-hidden -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-slate-900 shadow-2xl outline-none flex flex-col md:flex-row">
+            
+            {/* Sidebar / Top Steps */}
+            <div className="bg-slate-950 p-4 md:p-6 md:w-64 flex flex-row md:flex-col gap-4 border-b md:border-b-0 md:border-r border-white/5 overflow-x-auto">
+              <h3 className="hidden md:block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Checkout</h3>
+              
+              <div className={`flex items-center gap-3 whitespace-nowrap md:whitespace-normal px-3 py-2 rounded-lg transition-colors ${checkoutStep === "confirmation" ? "bg-emerald-500/10 border border-emerald-500/20" : "opacity-50"}`}>
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${checkoutStep === "confirmation" ? "bg-emerald-500 text-white" : "bg-slate-800 text-slate-400"}`}>1</div>
+                <span className={`text-sm font-semibold ${checkoutStep === "confirmation" ? "text-emerald-400" : "text-slate-400"}`}>Confirmação</span>
+              </div>
+              
+              <div className={`flex items-center gap-3 whitespace-nowrap md:whitespace-normal px-3 py-2 rounded-lg transition-colors ${checkoutStep === "payment" ? "bg-emerald-500/10 border border-emerald-500/20" : "opacity-50"}`}>
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${checkoutStep === "payment" ? "bg-emerald-500 text-white" : "bg-slate-800 text-slate-400"}`}>2</div>
+                <span className={`text-sm font-semibold ${checkoutStep === "payment" ? "text-emerald-400" : "text-slate-400"}`}>Pagamento PIX</span>
+              </div>
+            </div>
 
-                <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                  <p className="text-xs text-slate-300">Pagamento: {pendingPaymentOffer.paymentId}</p>
-                  <p className="text-xs text-slate-300">Total: {formatCurrency(pendingPaymentOffer.totalValue)}</p>
-                </div>
+            {/* Main Content */}
+            <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+              <div className="flex justify-between items-start mb-6">
+                <Dialog.Title className="text-xl font-bold text-white">
+                  {checkoutStep === "confirmation" ? "Confirme sua compra" : "Efetue o pagamento"}
+                </Dialog.Title>
+                <button
+                  type="button"
+                  onClick={minimizePixDialog}
+                  className="cursor-pointer rounded-md border border-white/15 p-1 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {checkoutStep === "confirmation" && (
+                <div className="space-y-6">
+                  <div className="grid gap-3 p-4 rounded-xl border border-white/5 bg-slate-800/40">
+                    <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                      <span className="text-sm text-slate-400">Rifa selecionada</span>
+                      <span className="text-sm font-medium text-white truncate max-w-[200px]">{raffle.title}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                      <span className="text-sm text-slate-400">Quantidade</span>
+                      <span className="text-sm font-medium text-white">{ticketCount} bilhetes</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-400">Valor total</span>
+                      <span className="text-lg font-bold text-emerald-400">{formatCurrency((Number(raffle.price) || 0) * ticketCount)}</span>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setCheckoutInfo(pendingPaymentOffer);
-                      setPendingPaymentOffer(null);
-                    }}
-                    className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
-                  >
-                    Usar pagamento em aberto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => requestPixPayment(true)}
+                    onClick={() => requestPixPayment(false)}
                     disabled={isPaying}
-                    className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 disabled:opacity-60"
+                    className="cursor-pointer disabled:cursor-not-allowed w-full flex items-center justify-center py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold uppercase tracking-wide transition-all disabled:opacity-50"
                   >
-                    {isPaying ? "Gerando..." : "Gerar novo PIX"}
+                    {isPaying ? "Gerando PIX..." : "Prosseguir para pagamento"}
                   </button>
                 </div>
-              </div>
-            ) : checkoutInfo ? (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-3">
-                  <p className="text-xs uppercase text-emerald-300">PIX gerado</p>
-                  <p className="mt-1 text-sm text-zinc-100">Pagamento: {checkoutInfo.paymentId}</p>
-                  <p className="text-sm text-zinc-100">Total: {formatCurrency(checkoutInfo.totalValue)}</p>
+              )}
+
+              {checkoutStep === "payment" && (
+                <div className="space-y-4">
+                  {pendingPaymentOffer && !checkoutInfo ? (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 p-4">
+                        <p className="text-sm text-amber-100 font-medium">Já existe um pagamento pendente para esta mesma quantidade de bilhetes.</p>
+                        <div className="mt-3 bg-slate-950/40 p-3 rounded-lg border border-amber-500/10">
+                          <p className="text-xs text-amber-200/70">ID: {pendingPaymentOffer.paymentId}</p>
+                          <p className="text-sm text-amber-300 font-bold mt-1">{formatCurrency(pendingPaymentOffer.totalValue)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCheckoutInfo(pendingPaymentOffer);
+                            setPendingPaymentOffer(null);
+                          }}
+                          className="cursor-pointer w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 transition-colors"
+                        >
+                          Usar código existente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requestPixPayment(true)}
+                          disabled={isPaying}
+                          className="cursor-pointer disabled:cursor-not-allowed w-full rounded-xl border border-white/10 hover:bg-white/5 text-white font-medium py-3 transition-colors disabled:opacity-50"
+                        >
+                          {isPaying ? "Gerando..." : "Gerar novo PIX"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : checkoutInfo ? (
+                    <div className="flex flex-col items-center space-y-6">
+                      <div className="w-full rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex flex-col items-center text-center">
+                        <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-1">Total a Pagar</span>
+                        <span className="text-3xl font-black text-white">{formatCurrency(checkoutInfo.totalValue)}</span>
+                      </div>
+                      
+                      {checkoutInfo.qrCodeBase64 && (
+                        <div className="p-3 bg-white rounded-2xl border border-white/20 shadow-xl">
+                          <Image
+                            src={`data:image/png;base64,${checkoutInfo.qrCodeBase64}`}
+                            alt="QR Code PIX"
+                            width={220}
+                            height={220}
+                            unoptimized
+                            className="rounded-lg"
+                          />
+                        </div>
+                      )}
+                      
+                      {checkoutInfo.qrCode && (
+                        <div className="w-full space-y-2">
+                          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Código Copia e Cola</p>
+                          <div className="flex bg-slate-950 rounded-xl border border-white/10 overflow-hidden">
+                            <div className="flex-1 p-3 overflow-x-auto no-scrollbar">
+                              <p className="text-xs text-slate-300 font-mono break-all">{checkoutInfo.qrCode}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(checkoutInfo.qrCode);
+                              }}
+                              className="cursor-pointer px-4 bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center border-l border-white/10 text-emerald-400 font-medium text-xs uppercase"
+                            >
+                              Copiar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex justify-center py-12">
+                      <span className="text-sm text-slate-400">Carregando dados de pagamento...</span>
+                    </div>
+                  )}
                 </div>
-
-                {checkoutInfo.qrCodeBase64 ? (
-                  <div className="flex justify-center">
-                    <Image
-                      src={`data:image/png;base64,${checkoutInfo.qrCodeBase64}`}
-                      alt="QR Code PIX"
-                      width={200}
-                      height={200}
-                      unoptimized
-                      className="h-48 w-48 rounded-lg border border-white/10 bg-white p-2"
-                    />
-                  </div>
-                ) : null}
-
-                {checkoutInfo.qrCode ? (
-                  <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                    <p className="text-[11px] uppercase text-slate-400">Codigo copia e cola</p>
-                    <p className="mt-2 break-all text-xs text-slate-200">{checkoutInfo.qrCode}</p>
-                  </div>
-                ) : null}
-
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={closePixDialogCompletely}
-                    className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-100 hover:bg-white/10"
-                  >
-                    Fechar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-300">Nenhum pagamento carregado.</p>
-            )}
+              )}
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -855,13 +906,93 @@ export function Raffle() {
         <button
           type="button"
           onClick={() => {
-            setPixDialogOpen(true);
+            setCheckoutModalOpen(true);
             setPixDialogMinimized(false);
           }}
-          className="fixed bottom-4 right-4 z-40 rounded-full border border-emerald-300/25 bg-emerald-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-200 shadow-lg backdrop-blur"
+          className="cursor-pointer fixed bottom-4 right-4 z-40 rounded-full border border-emerald-300/25 bg-emerald-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-200 shadow-lg backdrop-blur"
         >
           Abrir pagamento PIX
         </button>
+      ) : null}
+
+      {/* Descrição da Rifa */}
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
+        <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
+          <div className="flex items-center">
+            <CircleHelp size={16} className="mr-2 text-emerald-400" />
+            <h2 className="text-sm font-bold text-emerald-400 uppercase">Descrição / Regulamento</h2>
+          </div>
+        </div>
+
+        <p className="text-sm text-zinc-400 whitespace-pre-line">
+          {formattedDescription}
+        </p>
+      </div>
+
+      {/* Ranking */}
+      {showCollaboratorRanking ? (
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-slate-500/5 bg-slate-800/40 p-4 shadow-lg backdrop-blur-xl sm:p-6">
+          <div className="flex items-center border-b border-slate-500/5 pb-2 justify-between">
+            <div className="flex items-center">
+              <Users size={16} className="mr-2 text-emerald-400" />
+              <h2 className="text-sm font-bold text-emerald-400 uppercase">Ranking dos Colaboradores</h2>
+            </div>
+          </div>
+
+          <p className="text-sm text-zinc-300">Um prêmio garantido para os maiores compradores!</p>
+
+          <div className="border-t border-slate-500/5">
+            {rankingList.length === 0 ? (
+              <p className="text-center text-xs text-stone-500 py-4">Nenhum colaborador ainda.</p>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-white/5 bg-transparent">
+                <div className="hidden sm:grid grid-cols-[80px_1fr_120px_120px] gap-2 px-4 py-3 bg-transparent border-b border-white/5 border-dashed">
+                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Colocação</span>
+                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Nome</span>
+                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Bilhete</span>
+                  <span className="text-[9px] font-bold text-stone-500 tracking-[0.2em] uppercase text-center">Prêmio</span>
+                </div>
+                {rankingList.slice(0, 3).map((u, idx) => (
+                  <div
+                    key={u.position}
+                    className={`flex items-center justify-between gap-3 px-4 py-3 transition-colors ${idx !== 0 ? 'border-t border-white/5' : ''} bg-transparent sm:grid sm:grid-cols-[80px_1fr_120px_120px] sm:gap-2`}
+                  >
+                    <div className="flex items-center gap-3 sm:justify-center">
+                      <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-black ${u.color ?? 'border-white/10 bg-white/5 text-stone-400'}`}>
+                        {u.position <= 3 ? <Trophy size={14} /> : u.position}
+                      </span>
+                      <div className="flex flex-col sm:hidden">
+                        <span className="text-sm font-bold text-white truncate max-w-[140px]">{formatCollaboratorName(u.name)}</span>
+                        <span className="text-xs text-stone-400">{u.tickets.toLocaleString('pt-BR')} bilhetes</span>
+                      </div>
+                    </div>
+                    
+                    <span className="hidden sm:block text-xs font-medium text-stone-300 truncate text-center">{formatCollaboratorName(u.name)}</span>
+                    <span className="hidden sm:block text-[11px] font-bold text-stone-300 tabular-nums text-center">
+                      {u.tickets.toLocaleString('pt-BR')} {u.tickets === 1 ? "bilhete" : "bilhetes"}
+                    </span>
+                    <div className="flex flex-col items-end sm:items-center sm:flex-row sm:justify-center">
+                      <span className="sm:hidden text-[9px] uppercase font-bold text-stone-500 tracking-wider mb-0.5">Prêmio</span>
+                      <span className="text-xs sm:text-[11px] font-semibold text-emerald-400 sm:text-stone-300 truncate text-center">{rankingPrizeByPosition[u.position] ?? "Não definido"}</span>
+                    </div>
+                  </div>
+                ))}
+                {user && (
+                  <div className="py-2.5 text-center bg-transparent border-t border-white/5">
+                    {userRankingPosition ? (
+                      <>
+                        <p className="text-[9px] text-stone-500 font-medium">Sua posicao: #{userRankingPosition.position}</p>
+                        <p className="text-[10px] text-stone-400">{userRankingPosition.tickets.toLocaleString("pt-BR")} bilhetes</p>
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-stone-400">Voce ainda nao possui bilhetes para entrar no ranking.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       ) : null}
     </motion.div >
   );
