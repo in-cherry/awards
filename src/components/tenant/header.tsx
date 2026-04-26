@@ -106,22 +106,22 @@ export function Header() {
           style={{ display: "inline-block" }}
         >
           <Image
-            src={`${tenant?.logoUrl || "/incherry_logo.svg"}`}
-            alt={tenant?.name ? `${tenant.name} Logo` : "InCherry Logo"}
+            src={`${tenant?.logoUrl || tenant?.faviconUrl || "/winzy_logo.png"}`}
+            alt={tenant?.name ? `${tenant.name} Logo` : "Winzy Logo"}
             width={32}
             height={32}
           />
         </motion.a>
 
         <div className="flex items-center gap-2">
-          <motion.a
+          {/* <motion.a
             href="/"
             whileHover={{ scale: 1.1 }}
             style={{ display: "inline-block" }}
             className="text-sm text-gray-300 hover:text-white"
           >
             <Ticket size={16} />
-          </motion.a>
+          </motion.a> */}
 
           <button className="flex items-center justify-center text-stone-400">
             <MoreVertical size={12} />

@@ -76,6 +76,7 @@ export default async function Tenant({ params }: TenantProps) {
     name: tenant.name,
     slug: tenant.slug,
     logoUrl: tenant.logo,
+    faviconUrl: tenant.favicon,
     instagramUrl: tenant.instagram,
     telegramUrl: tenant.telegram,
     supportUrl: tenant.supportUrl,

@@ -25,6 +25,7 @@ export default async function ClientLoginPage(props: { params: Params }) {
     select: {
       name: true,
       logo: true,
+      favicon: true,
       subscription: {
         select: {
           status: true,
@@ -43,6 +44,7 @@ export default async function ClientLoginPage(props: { params: Params }) {
       tenant={{
         name: tenant.name,
         logoUrl: tenant.logo ?? null,
+        faviconUrl: tenant.favicon ?? null,
       }}
     />
   );

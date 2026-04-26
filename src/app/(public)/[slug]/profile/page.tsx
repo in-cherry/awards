@@ -27,6 +27,7 @@ export default async function ClientProfilePage(props: { params: Params }) {
     select: {
       name: true,
       logo: true,
+      favicon: true,
       subscription: {
         select: {
           status: true,
@@ -45,6 +46,7 @@ export default async function ClientProfilePage(props: { params: Params }) {
       tenant={{
         name: tenantDetails.name,
         logoUrl: tenantDetails.logo ?? null,
+        faviconUrl: tenantDetails.favicon ?? null,
       }}
     />
   );
