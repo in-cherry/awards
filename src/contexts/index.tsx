@@ -8,6 +8,7 @@ type Tenant = {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  faviconUrl?: string | null;
   instagramUrl?: string | null;
   telegramUrl?: string | null;
   supportUrl?: string | null;

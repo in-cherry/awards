@@ -80,6 +80,7 @@ type ClientProfileViewProps = {
   tenant?: {
     name?: string;
     logoUrl?: string | null;
+    faviconUrl?: string | null;
   };
 };
 
@@ -322,6 +323,7 @@ export function ClientProfileView({ slug, tenant }: ClientProfileViewProps) {
         <TenantLogoHeader
           href={`/${slug}`}
           logoUrl={tenant?.logoUrl}
+          faviconUrl={tenant?.faviconUrl}
           tenantName={tenant?.name}
           compact
         />

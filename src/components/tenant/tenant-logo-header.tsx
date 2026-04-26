@@ -8,11 +8,13 @@ import { ArrowLeft } from "lucide-react";
 interface TenantLogoHeaderProps {
   href: string;
   logoUrl?: string | null;
+  faviconUrl?: string | null;
   tenantName?: string;
   compact?: boolean;
 }
 
-export function TenantLogoHeader({ href, logoUrl, tenantName, compact = false }: TenantLogoHeaderProps) {
+export function TenantLogoHeader({ href, logoUrl, faviconUrl, tenantName, compact = false }: TenantLogoHeaderProps) {
+  const resolvedLogo = logoUrl || faviconUrl || "/winzy_logo.png";
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -27,13 +29,13 @@ export function TenantLogoHeader({ href, logoUrl, tenantName, compact = false }:
         <ArrowLeft className="h-4 w-4 text-slate-400" />
       </Link>
 
-      {logoUrl ? (
+      {resolvedLogo ? (
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800/50 p-1"
         >
           <Image
-            src={logoUrl}
+            src={resolvedLogo}
             alt={tenantName || "Logo"}
             width={40}
             height={40}
