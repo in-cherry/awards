@@ -21,7 +21,8 @@ type CliArgs = {
 function parseArg(name: string): string | undefined {
   const prefix = `--${name}=`;
   const arg = process.argv.find((item) => item.startsWith(prefix));
-  return arg ? arg.slice(prefix.length) : undefined;
+  if (arg) return arg.slice(prefix.length);
+  return process.env[`npm_config_${name}`];
 }
 
 function buildArgs(): CliArgs {
