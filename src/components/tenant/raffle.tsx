@@ -1,7 +1,7 @@
 "use client";
 
 import { useApp } from "@/contexts";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { BadgeCheck, Check, CircleHelp, Gift, Instagram, MessageCircle, Minus, Plus, ShoppingBag, Ticket, Trophy, Users, User, X, Sparkles } from "lucide-react";
@@ -690,14 +690,82 @@ export function Raffle() {
             <span className="text-lg font-bold text-white">{formatCurrency((Number(raffle.price) || 0) * ticketCount)}</span>
           </div>
           {hasAvailableMysteryPrizes ? (
-            <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-slate-800/40 px-3 py-2 sm:px-4">
-              <div className="rounded-xl">
-                <Gift size={16} className="text-zinc-500" />
-              </div>
-              <span className="text-xs font-semibold uppercase text-zinc-500">
-                Você ganha<br />{getBoxesFromTickets(ticketCount)} caixa{getBoxesFromTickets(ticketCount) !== 1 ? "s" : ""}
-              </span>
-            </div>
+            (() => {
+              const boxesEarned = getBoxesFromTickets(ticketCount);
+              const hasBoxes = boxesEarned > 0;
+              return (
+                <motion.div 
+                  layout
+                  className={`flex items-center gap-3 rounded-xl border px-3 py-2 sm:px-4 transition-all duration-500 ${hasBoxes ? "border-purple-500/50 bg-purple-500/10 shadow-[0_0_20px_rgba(168,85,247,0.2)]" : "border-white/5 bg-slate-800/40"}`}
+                >
+                  <motion.div 
+                    layout
+                    className={`rounded-xl flex h-10 w-10 shrink-0 items-center justify-center transition-colors duration-500 ${hasBoxes ? "bg-purple-500/20 text-purple-400" : "bg-white/5 text-zinc-500"}`}
+                  >
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {hasBoxes ? (
+                        <motion.div
+                          key="gift-earned"
+                          initial={{ scale: 0, rotate: -90 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0, rotate: 90 }}
+                          transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                        >
+                          <Gift size={20} className="animate-bounce" />
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="gift-none"
+                          initial={{ scale: 0, rotate: 90 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0, rotate: -90 }}
+                          transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                        >
+                          <Gift size={18} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                  <motion.div layout className="flex flex-col relative overflow-hidden flex-1">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {hasBoxes ? (
+                        <motion.div
+                          key="text-earned"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ type: "spring", damping: 15, stiffness: 150 }}
+                          className="flex flex-col"
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-purple-300">
+                            Bônus Desbloqueado
+                          </span>
+                          <span className="font-black leading-tight text-sm text-white">
+                            Você ganha {boxesEarned} caixa{boxesEarned !== 1 ? "s" : ""}!
+                          </span>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="text-none"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ type: "spring", damping: 15, stiffness: 150 }}
+                          className="flex flex-col"
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            Caixas bônus
+                          </span>
+                          <span className="font-black leading-tight text-xs text-zinc-400 mt-0.5">
+                            0 caixas
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                </motion.div>
+              );
+            })()
           ) : null}
         </div>
 
